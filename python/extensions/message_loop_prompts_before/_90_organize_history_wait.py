@@ -1,7 +1,11 @@
+import logging
+
 from python.helpers.extension import Extension
 from agent import LoopData
 from python.extensions.message_loop_end._10_organize_history import DATA_NAME_TASK
 from python.helpers.defer import DeferredTask, THREAD_BACKGROUND
+
+logger = logging.getLogger(__name__)
 
 
 class OrganizeHistoryWait(Extension):
@@ -10,7 +14,7 @@ class OrganizeHistoryWait(Extension):
         # sync action only required if the history is too large, otherwise leave it in background
         while self.agent.history.is_over_limit():
             # get task
-            task: DeferredTask|None = self.agent.get_data(DATA_NAME_TASK) 
+            task: DeferredTask|None = self.agent.get_data(DATA_NAME_TASK)
 
             # Check if the task is already done
             if task:
@@ -18,7 +22,12 @@ class OrganizeHistoryWait(Extension):
                     self.agent.context.log.set_progress("Compressing history...")
 
                 # Wait for the task to complete
-                await task.result()
+                try:
+                    await task.result()
+                except Exception as e:
+                    logger.warning("History compression task failed: %s", e)
+                    self.agent.set_data(DATA_NAME_TASK, None)
+                    break
 
                 # Clear the coroutine data after it's done
                 self.agent.set_data(DATA_NAME_TASK, None)
