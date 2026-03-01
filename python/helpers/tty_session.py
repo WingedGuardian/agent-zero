@@ -1,4 +1,4 @@
-import asyncio, os, sys, platform, errno
+import asyncio, os, sys, platform, errno, signal
 
 _IS_WIN = platform.system() == "Windows"
 if _IS_WIN:
@@ -56,10 +56,20 @@ class TTYSession:
                 await self._pump_task
             except asyncio.CancelledError:
                 pass
-        # Terminate the process if it exists
+        # Terminate the process group if it exists
         if self._proc:
-            self._proc.terminate()
-            await self._proc.wait()
+            try:
+                pgid = os.getpgid(self._proc.pid)
+                os.killpg(pgid, signal.SIGTERM)
+            except (ProcessLookupError, PermissionError, OSError):
+                try:
+                    self._proc.terminate()
+                except ProcessLookupError:
+                    pass
+            try:
+                await asyncio.wait_for(self._proc.wait(), timeout=5)
+            except asyncio.TimeoutError:
+                self.kill()
         self._proc = None
         self._pump_task = None
 
@@ -80,25 +90,24 @@ class TTYSession:
         return await self._proc.wait()
 
     def kill(self):
-        """Force-kill the running child process.
+        """Force-kill the running child process and its entire process group.
 
-        This is best-effort: if the process has already terminated (which can
-        happen if *close()* was called elsewhere or the child exited by
-        itself) we silently ignore the *ProcessLookupError* raised by
-        *asyncio.subprocess.Process.kill()*. This prevents race conditions
-        where multiple coroutines attempt to close the same session.
+        Uses os.killpg to ensure all child processes spawned by the shell
+        are also terminated, preventing orphaned processes and I/O storms.
+        Falls back to proc.kill() if process group kill fails.
         """
         if self._proc is None:
-            # Already closed or never started – nothing to do
             return
 
-        # Only attempt to kill if the process is still running
         if getattr(self._proc, "returncode", None) is None:
             try:
-                self._proc.kill()
-            except ProcessLookupError:
-                # Child already gone – treat as successfully killed
-                pass
+                pgid = os.getpgid(self._proc.pid)
+                os.killpg(pgid, signal.SIGKILL)
+            except (ProcessLookupError, PermissionError, OSError):
+                try:
+                    self._proc.kill()
+                except ProcessLookupError:
+                    pass
 
     async def read(self, timeout=None):
         # Return any decoded text the child produced, or None on timeout
@@ -168,6 +177,7 @@ async def _spawn_posix_pty(cmd, cwd, env, echo):
         cwd=cwd,
         env=env,
         close_fds=True,
+        start_new_session=True,
     )
     os.close(slave)
 

@@ -34,6 +34,17 @@ from typing import Callable
 from python.helpers.localization import Localization
 from python.helpers.extension import call_extensions
 from python.helpers.errors import RepairableException
+from python.helpers.guardrails import log_guardrail_block
+
+# Tool execution timeout overrides (seconds)
+TOOL_TIMEOUTS = {
+    "code_execution": 180,
+    "call_subordinate": 300,
+    "web_search": 15,
+    "web_fetch": 30,
+}
+DEFAULT_TOOL_TIMEOUT = 60
+TOOL_OUTPUT_MAX_CHARS = 50_000
 
 
 class AgentContextType(Enum):
@@ -913,7 +924,33 @@ class Agent:
                         tool_name=tool_name,
                     )
 
-                    response = await tool.execute(**tool_args)
+                    # Registry-level timeout for tool execution
+                    tool_timeout = TOOL_TIMEOUTS.get(tool_name, DEFAULT_TOOL_TIMEOUT)
+                    try:
+                        response = await asyncio.wait_for(
+                            tool.execute(**tool_args), timeout=tool_timeout
+                        )
+                    except asyncio.TimeoutError:
+                        await log_guardrail_block(
+                            tool_name, "timeout", tool_timeout, tool_timeout
+                        )
+                        from python.helpers.tool import Response as ToolResponse
+                        response = ToolResponse(
+                            message=f"Tool '{tool_name}' timed out after {tool_timeout}s.",
+                            break_loop=False,
+                        )
+
+                    # Truncate tool output to prevent context window overflow
+                    if response.message and len(response.message) > TOOL_OUTPUT_MAX_CHARS:
+                        original_len = len(response.message)
+                        response.message = (
+                            response.message[:TOOL_OUTPUT_MAX_CHARS]
+                            + f"\n\n[Output truncated: {original_len} -> {TOOL_OUTPUT_MAX_CHARS} chars]"
+                        )
+                        await log_guardrail_block(
+                            tool_name, "output_truncated", original_len, TOOL_OUTPUT_MAX_CHARS
+                        )
+
                     await self.handle_intervention()
 
                     # Allow extensions to postprocess tool response

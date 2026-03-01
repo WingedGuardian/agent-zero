@@ -135,7 +135,15 @@ class DownloadFile(ApiHandler):
         raise Exception(f"File {file_path} not found")
 
 
+MAX_DOWNLOAD_SIZE = 10 * 1024 * 1024  # 10MB
+
+
 async def fetch_file(path):
+    file_size = os.path.getsize(path)
+    if file_size > MAX_DOWNLOAD_SIZE:
+        raise ValueError(
+            f"File too large to read: {file_size} bytes (limit: {MAX_DOWNLOAD_SIZE})"
+        )
     with open(path, "rb") as file:
         file_content = file.read()
         return base64.b64encode(file_content).decode("utf-8")

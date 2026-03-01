@@ -74,27 +74,69 @@ def get_version():
         return "unknown"
 
 
+GIT_CLONE_TIMEOUT = 120  # seconds
+GIT_CLONE_MAX_SIZE_MB = 50
+
+
 def clone_repo(url: str, dest: str, token: str | None = None):
     """Clone a git repository. Uses http.extraHeader for token auth (never stored in URL/config)."""
+    import logging
+    logger = logging.getLogger("guardrails")
+
+    # Check ALLOW_CLONE env var
+    allow_clone = os.environ.get("ALLOW_CLONE", "false").lower()
+    if allow_clone not in ("true", "1", "yes"):
+        raise Exception("Git clone is disabled (ALLOW_CLONE is not set to true)")
+
+    # GitHub API size pre-check for github.com URLs
+    parsed = urlparse(url)
+    if parsed.hostname in ("github.com", "www.github.com"):
+        path_parts = parsed.path.strip("/").replace(".git", "").split("/")
+        if len(path_parts) >= 2:
+            owner, repo_name = path_parts[0], path_parts[1]
+            try:
+                import json
+                import urllib.request
+                api_url = f"https://api.github.com/repos/{owner}/{repo_name}"
+                req = urllib.request.Request(api_url, headers={"User-Agent": "agent-zero"})
+                with urllib.request.urlopen(req, timeout=10) as resp:
+                    data = json.loads(resp.read())
+                    size_kb = data.get("size", 0)
+                    size_mb = size_kb / 1024
+                    if size_mb > GIT_CLONE_MAX_SIZE_MB:
+                        raise Exception(
+                            f"Repository too large: {size_mb:.0f}MB (limit: {GIT_CLONE_MAX_SIZE_MB}MB)"
+                        )
+            except Exception as e:
+                if "too large" in str(e):
+                    raise
+                logger.info("GitHub API size pre-check failed (non-fatal): %s", e)
+
     cmd = ['git']
-    
+
     if token:
         # GitHub Git HTTP requires Basic Auth, not Bearer
         auth_string = f"x-access-token:{token}"
         auth_base64 = base64.b64encode(auth_string.encode()).decode()
         cmd.extend(['-c', f'http.extraHeader=Authorization: Basic {auth_base64}'])
-    
-    cmd.extend(['clone', '--progress', '--', url, dest])
-    
+
+    cmd.extend(['clone', '--depth=1', '--progress', '--', url, dest])
+
     env = os.environ.copy()
     env['GIT_TERMINAL_PROMPT'] = '0'
-    
-    result = subprocess.run(cmd, capture_output=True, text=True, env=env)
-    
+
+    try:
+        result = subprocess.run(
+            cmd, capture_output=True, text=True, env=env,
+            timeout=GIT_CLONE_TIMEOUT,
+        )
+    except subprocess.TimeoutExpired:
+        raise Exception(f"Git clone timed out after {GIT_CLONE_TIMEOUT}s")
+
     if result.returncode != 0:
         error_msg = result.stderr.strip() or result.stdout.strip() or 'Unknown error'
         raise Exception(f"Git clone failed: {error_msg}")
-    
+
     return Repo(dest)
 
 

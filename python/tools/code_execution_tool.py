@@ -10,7 +10,48 @@ from python.helpers.shell_ssh import SSHInteractiveSession
 from python.helpers.docker import DockerContainerManager
 from python.helpers.strings import truncate_text as truncate_text_string
 from python.helpers.messages import truncate_text as truncate_text_agent
+from python.helpers.guardrails import log_guardrail_block
 import re
+
+SHELL_STDOUT_CAP = 512 * 1024  # 512KB max stdout
+
+# Blocked dunder attributes that enable sandbox escape
+BLOCKED_DUNDERS = {
+    "__class__", "__bases__", "__subclasses__", "__mro__",
+    "__globals__", "__code__", "__builtins__", "__import__",
+    "__loader__", "__spec__", "__qualname__", "__func__",
+    "__self__", "__wrapped__", "__closure__", "__dict__",
+    "__getattribute__", "__init_subclass__", "__traceback__",
+}
+# Pre-compiled pattern for fast scanning
+_DUNDER_PATTERN = re.compile(
+    r"(?:" + "|".join(re.escape(d) for d in BLOCKED_DUNDERS) + r")"
+)
+
+COMMAND_ALLOWLIST = {
+    "ls", "cat", "grep", "find", "wc", "head", "tail",
+    "python", "python3", "pip", "pip3", "ipython",
+    "gh", "sqlite3", "curl", "wget", "git",
+    "diff", "patch", "sort", "uniq", "awk", "sed",
+    "date", "echo", "printf", "test", "stat", "file",
+    "jq", "bc", "tr", "cut", "tee",
+    "mkdir", "cp", "mv", "touch",
+    "node", "npm", "npx",
+    "cd", "pwd", "which", "whoami", "env", "export",
+    "chmod", "chown", "ln", "readlink",
+    "tar", "gzip", "gunzip", "zip", "unzip",
+    "apt", "apt-get", "dpkg",
+    "systemctl", "journalctl",
+    "ps", "top", "htop", "kill", "pkill",
+    "df", "du", "free", "uname",
+    "ssh", "scp", "rsync",
+    "docker", "docker-compose",
+    "rg", "fd", "tree", "less", "more", "vi", "vim", "nano",
+    "source", ".", "bash", "sh", "zsh",
+    "true", "false", "yes", "no",
+    "xargs", "parallel", "nohup", "timeout",
+    "id", "groups", "hostname",
+}
 
 # Timeouts for python, nodejs, and terminal runtimes.
 CODE_EXEC_TIMEOUTS: dict[str, int] = {
@@ -161,6 +202,15 @@ class CodeExecution(Tool):
         return self.state
 
     async def execute_python_code(self, session: int, code: str, reset: bool = False):
+        # Scan for blocked dunder attributes that enable sandbox escape
+        match = _DUNDER_PATTERN.search(code)
+        if match:
+            blocked = match.group()
+            await log_guardrail_block(
+                "python_exec", "blocked_dunder", blocked, "BLOCKED_DUNDERS"
+            )
+            return f"Blocked: Python code contains forbidden attribute '{blocked}'."
+
         escaped_code = shlex.quote(code)
         command = f"ipython -c {escaped_code}"
         prefix = "python> " + self.format_command_for_output(code) + "\n\n"
@@ -175,6 +225,22 @@ class CodeExecution(Tool):
     async def execute_terminal_command(
         self, session: int, command: str, reset: bool = False
     ):
+        # Command allowlist check
+        try:
+            tokens = shlex.split(command)
+            if tokens:
+                import os.path
+                executable = os.path.basename(tokens[0])
+                if executable not in COMMAND_ALLOWLIST:
+                    await log_guardrail_block(
+                        "shell", "command_not_allowed", executable, "COMMAND_ALLOWLIST"
+                    )
+                    return f"Blocked: command '{executable}' is not in the allowed command list."
+        except ValueError:
+            # shlex.split can fail on malformed input — allow through
+            # but log it so we can investigate
+            await log_guardrail_block("shell", "unparseable_command", command[:100], "shlex")
+
         prefix = ("bash>" if not runtime.is_windows() or self.agent.config.code_exec_ssh_enabled else "PS>") + self.format_command_for_output(command) + "\n\n"
         return await self.terminal_session(session, command, reset, prefix)
 
@@ -470,7 +536,7 @@ class CodeExecution(Tool):
         output = re.sub(r"(?<!\\)\\x[0-9A-Fa-f]{2}", "", output)
         # Strip every line of output before truncation
         # output = "\n".join(line.strip() for line in output.splitlines())
-        output = truncate_text_agent(agent=self.agent, output=output, threshold=1000000) # ~1MB, larger outputs should be dumped to file, not read from terminal
+        output = truncate_text_agent(agent=self.agent, output=output, threshold=SHELL_STDOUT_CAP) # 512KB cap to prevent I/O storms
         return output
 
     async def ensure_cwd(self) -> str | None:
