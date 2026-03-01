@@ -562,6 +562,8 @@ class WebSocketClient {
       reconnection: true,
       transports: ["websocket", "polling"],
       withCredentials: true,
+      pingInterval: 25000,
+      pingTimeout: 120000,
       auth: (cb) => {
         getCsrfToken()
           .then((token) => cb({ csrf_token: token }))

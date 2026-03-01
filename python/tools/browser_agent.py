@@ -29,6 +29,8 @@ class State:
         self.use_agent: Optional[browser_use.Agent] = None
         self.secrets_dict: Optional[dict[str, str]] = None
         self.iter_no = 0
+        self._last_progress_time: float = 0.0
+        self._progress_debounce: float = 0.5
 
     def __del__(self):
         self.kill_task()
@@ -383,6 +385,13 @@ class BrowserAgent(Tool):
         self.agent.set_data("_browser_agent_state", self.state)
 
     def update_progress(self, text):
+        import time
+        now = time.time()
+        # Debounce: Only emit progress every 500ms to prevent WebSocket overwhelm
+        if now - self._last_progress_time < self._progress_debounce:
+            return
+        self._last_progress_time = now
+
         text = self._mask(text)
         short = text.split("\n")[-1]
         if len(short) > 50:

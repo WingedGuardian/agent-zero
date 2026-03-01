@@ -54,7 +54,7 @@ class ConnectionProjection:
 class StateMonitor:
     """Per-sid dirty tracking with debounced snapshot push scheduling."""
 
-    def __init__(self, debounce_seconds: float = 0.025) -> None:
+    def __init__(self, debounce_seconds: float = 0.1) -> None:
         self.debounce_seconds = float(debounce_seconds)
         self._lock = threading.RLock()
         self._projections: dict[ConnectionIdentity, ConnectionProjection] = {}
