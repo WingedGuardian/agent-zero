@@ -300,14 +300,15 @@ def get_available_agents_dict(
 def get_paths(
     agent: "Agent|None",
     *subpaths,
-    must_exist_completely: bool = True, 
+    must_exist_completely: bool = True,
     include_project: bool = True,
     include_user: bool = True,
     include_default: bool = True,
+    include_plugins: bool = True,
     default_root: str = "",
 ) -> list[str]:
     """Returns list of file paths for the given agent and subpaths, searched in order of priority:
-    project/agents/, project/, usr/agents/, agents/, usr/, default."""
+    project/agents/, project/, usr/agents/, plugin agents/, agents/, usr/, plugins/, default."""
     paths: list[str] = []
     check_subpaths = subpaths if must_exist_completely else []
     profile_name = agent.config.profile if agent and agent.config.profile else ""
@@ -339,6 +340,14 @@ def get_paths(
         if (not must_exist_completely) or files.exists(files.get_abs_path(USER_AGENTS_DIR, profile_name, *check_subpaths)):
             paths.append(path)
 
+        # plugin agents/<profile>/...
+        if include_plugins:
+            from python.helpers import plugins
+            for plugin_dir in plugins.get_enabled_plugin_paths(agent, "agents", profile_name):
+                path = files.get_abs_path(plugin_dir, *subpaths)
+                if (not must_exist_completely) or files.exists(files.get_abs_path(plugin_dir, *check_subpaths)):
+                    paths.append(path)
+
         # agents/<profile>/...
         path = files.get_abs_path(DEFAULT_AGENTS_DIR, profile_name, *subpaths)
         if (not must_exist_completely) or files.exists(files.get_abs_path(DEFAULT_AGENTS_DIR, profile_name, *check_subpaths)):
@@ -349,6 +358,15 @@ def get_paths(
         path = files.get_abs_path(USER_DIR, *subpaths)
         if (not must_exist_completely) or files.exists(path):
             paths.append(path)
+
+    if include_plugins:
+        # plugins/*/subpaths...
+        from python.helpers import plugins
+        for plugin_dir in plugins.get_enabled_plugin_paths(agent):
+            path = files.get_abs_path(plugin_dir, *subpaths)
+            if (not must_exist_completely) or files.exists(path):
+                if path not in paths:
+                    paths.append(path)
 
     if include_default:
         # default_root/...
