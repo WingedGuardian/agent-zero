@@ -29,8 +29,6 @@ class State:
         self.use_agent: Optional[browser_use.Agent] = None
         self.secrets_dict: Optional[dict[str, str]] = None
         self.iter_no = 0
-        self._last_progress_time: float = 0.0
-        self._progress_debounce: float = 0.5
 
     def __del__(self):
         self.kill_task()
@@ -388,7 +386,8 @@ class BrowserAgent(Tool):
         import time
         now = time.time()
         # Debounce: Only emit progress every 500ms to prevent WebSocket overwhelm
-        if now - self._last_progress_time < self._progress_debounce:
+        last = getattr(self, "_last_progress_time", 0.0)
+        if now - last < 0.5:
             return
         self._last_progress_time = now
 
