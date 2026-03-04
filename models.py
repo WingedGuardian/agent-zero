@@ -2,6 +2,7 @@ from dataclasses import dataclass, field
 from enum import Enum
 import logging
 import os
+import threading
 from typing import (
     Any,
     Awaitable,
@@ -45,6 +46,23 @@ from pydantic import ConfigDict
 
 
 _logger = logging.getLogger(__name__)
+
+# Per-host semaphore registry for embedding calls.
+# Serializes concurrent embedding requests to the same API backend (keyed by
+# api_base URL) so CPU-only inference servers like Ollama don't get saturated.
+# Cloud APIs (no api_base) are unaffected.
+_host_embedding_sems: dict[str, threading.Semaphore] = {}
+_host_embedding_sems_lock = threading.Lock()
+
+
+def _get_host_embedding_semaphore(api_base: str) -> threading.Semaphore | None:
+    """Return a per-host semaphore for the given api_base, or None if unset."""
+    if not api_base:
+        return None
+    with _host_embedding_sems_lock:
+        if api_base not in _host_embedding_sems:
+            _host_embedding_sems[api_base] = threading.Semaphore(1)
+        return _host_embedding_sems[api_base]
 
 
 # disable extra logging, must be done repeatedly, otherwise browser-use will turn it back on for some reason
@@ -709,19 +727,33 @@ class LiteLLMEmbeddingWrapper(Embeddings):
         # Apply rate limiting if configured
         apply_rate_limiter_sync(self.a0_model_conf, " ".join(texts))
 
-        resp = embedding(model=self.model_name, input=texts, **self.kwargs)
-        return [
-            item.get("embedding") if isinstance(item, dict) else item.embedding  # type: ignore
-            for item in resp.data  # type: ignore
-        ]
+        sem = _get_host_embedding_semaphore(self.kwargs.get("api_base", ""))
+        if sem:
+            sem.acquire()
+        try:
+            resp = embedding(model=self.model_name, input=texts, **self.kwargs)
+            return [
+                item.get("embedding") if isinstance(item, dict) else item.embedding  # type: ignore
+                for item in resp.data  # type: ignore
+            ]
+        finally:
+            if sem:
+                sem.release()
 
     def embed_query(self, text: str) -> List[float]:
         # Apply rate limiting if configured
         apply_rate_limiter_sync(self.a0_model_conf, text)
 
-        resp = embedding(model=self.model_name, input=[text], **self.kwargs)
-        item = resp.data[0]  # type: ignore
-        return item.get("embedding") if isinstance(item, dict) else item.embedding  # type: ignore
+        sem = _get_host_embedding_semaphore(self.kwargs.get("api_base", ""))
+        if sem:
+            sem.acquire()
+        try:
+            resp = embedding(model=self.model_name, input=[text], **self.kwargs)
+            item = resp.data[0]  # type: ignore
+            return item.get("embedding") if isinstance(item, dict) else item.embedding  # type: ignore
+        finally:
+            if sem:
+                sem.release()
 
 
 class LocalSentenceTransformerWrapper(Embeddings):

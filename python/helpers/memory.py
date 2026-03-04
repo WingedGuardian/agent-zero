@@ -162,7 +162,8 @@ class Memory:
 
         # here we setup the embeddings model with the chosen cache storage
         embedder = CacheBackedEmbeddings.from_bytes_store(
-            embeddings_model, store, namespace=embeddings_model_id
+            embeddings_model, store, namespace=embeddings_model_id,
+            batch_size=4,  # limit per-request batch size for CPU backends
         )
 
         # initial DB and docs variables
