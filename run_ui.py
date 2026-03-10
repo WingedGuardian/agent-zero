@@ -551,6 +551,15 @@ def init_a0():
     # preload
     initialize.initialize_preload()
 
+    # Genesis server startup — initialize background infrastructure
+    # CRITICAL REBASE INVARIANT: Without this, Genesis background systems
+    # (awareness loop, learning scheduler, inbox monitor) never start.
+    # Verify after every AZ update: grep -n "server_startup" run_ui.py
+    from python.helpers import defer, extension
+    defer.DeferredTask("GenesisBootstrap").start_task(
+        extension.call_extensions, "server_startup"
+    ).result_sync()
+
 
 # run the internal server
 if __name__ == "__main__":
