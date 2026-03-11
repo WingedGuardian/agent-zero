@@ -34,6 +34,7 @@ class InitializeGenesis(Extension):
             # Wire references for backward compat
             self.agent.genesis_db = rt.db
             self.agent.genesis_awareness_loop = rt.awareness_loop
+            self.agent.genesis_retriever = rt.hybrid_retriever
             logger.info("Genesis init wired to agent")
 
         except ImportError:
