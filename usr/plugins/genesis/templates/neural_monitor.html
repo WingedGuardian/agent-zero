@@ -1,0 +1,458 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Genesis Neural Monitor</title>
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body {
+    background: #0f172a;
+    color: #e2e8f0;
+    font-family: 'SF Mono', 'Fira Code', 'Cascadia Code', monospace;
+    font-size: 13px;
+    overflow-x: hidden;
+}
+.header {
+    display: flex; justify-content: space-between; align-items: center;
+    padding: 16px 24px; border-bottom: 1px solid #1e293b;
+}
+.header h1 { font-size: 16px; font-weight: 600; letter-spacing: 2px; color: #94a3b8; }
+.header .meta { color: #64748b; font-size: 12px; }
+.container { display: flex; height: calc(100vh - 52px); }
+.main-panel { flex: 1; padding: 24px; overflow-y: auto; }
+.side-panel {
+    width: 280px; min-width: 280px; border-left: 1px solid #1e293b;
+    padding: 16px; overflow-y: auto;
+}
+
+/* Neural Map */
+.neural-map {
+    position: relative; width: 100%; max-width: 600px;
+    margin: 0 auto; aspect-ratio: 1;
+}
+.ring { position: absolute; display: flex; flex-wrap: wrap; justify-content: center; align-items: center; gap: 8px; }
+.ring-center { top: 35%; left: 35%; width: 30%; height: 30%; }
+.ring-inner { top: 20%; left: 20%; width: 60%; height: 60%; }
+.ring-outer { top: 8%; left: 8%; width: 84%; height: 84%; }
+.ring-periphery { top: 0; left: 0; width: 100%; height: 100%; }
+
+.dot {
+    border-radius: 50%; cursor: pointer; position: relative;
+    transition: background-color 0.3s, transform 0.15s;
+    display: flex; align-items: center; justify-content: center;
+    flex-shrink: 0;
+}
+.dot:hover { transform: scale(1.3); z-index: 10; }
+.dot-center { width: 28px; height: 28px; }
+.dot-inner { width: 18px; height: 18px; }
+.dot-outer { width: 13px; height: 13px; }
+.dot-periphery { width: 9px; height: 9px; }
+
+.dot-healthy { background: #4ade80; }
+.dot-degraded { background: #facc15; }
+.dot-down { background: #ef4444; }
+.dot-unknown { background: #6b7280; }
+
+/* Tooltip */
+.tooltip {
+    display: none; position: absolute; bottom: calc(100% + 8px); left: 50%;
+    transform: translateX(-50%); background: #1e293b; border: 1px solid #334155;
+    border-radius: 6px; padding: 8px 12px; white-space: nowrap; z-index: 100;
+    font-size: 11px; pointer-events: none;
+}
+.dot:hover .tooltip { display: block; }
+.tooltip .tt-name { color: #f8fafc; font-weight: 600; margin-bottom: 4px; }
+.tooltip .tt-row { color: #94a3b8; }
+
+/* Dot labels */
+.dot-label {
+    position: absolute; top: calc(100% + 2px); left: 50%;
+    transform: translateX(-50%); font-size: 8px; color: #64748b;
+    white-space: nowrap; pointer-events: none; text-align: center;
+    max-width: 60px; overflow: hidden; text-overflow: ellipsis;
+}
+.dot-center .dot-label { font-size: 10px; max-width: 80px; }
+
+/* Surplus box */
+.surplus-box {
+    background: #1e293b; border: 1px solid #334155; border-radius: 8px;
+    padding: 12px 16px; margin-top: 24px; max-width: 600px; margin-left: auto; margin-right: auto;
+}
+.surplus-box h3 { font-size: 12px; color: #94a3b8; margin-bottom: 8px; text-transform: uppercase; letter-spacing: 1px; }
+.surplus-row { display: flex; justify-content: space-between; color: #cbd5e1; margin: 4px 0; }
+
+/* Side panel sections */
+.section { margin-bottom: 20px; }
+.section h3 {
+    font-size: 11px; text-transform: uppercase; letter-spacing: 1px;
+    color: #64748b; margin-bottom: 8px; padding-bottom: 4px; border-bottom: 1px solid #1e293b;
+}
+.section-row { display: flex; justify-content: space-between; align-items: center; padding: 3px 0; }
+.section-row .label { color: #94a3b8; }
+.section-row .value { font-weight: 600; }
+
+.status-dot {
+    display: inline-block; width: 8px; height: 8px; border-radius: 50%;
+    margin-right: 6px; vertical-align: middle;
+}
+.status-healthy { background: #4ade80; }
+.status-degraded { background: #facc15; }
+.status-down { background: #ef4444; }
+.status-unknown { background: #6b7280; }
+
+.badge {
+    display: inline-block; padding: 1px 6px; border-radius: 3px;
+    font-size: 10px; font-weight: 600;
+}
+.badge-normal { background: #166534; color: #4ade80; }
+.badge-warning { background: #854d0e; color: #facc15; }
+.badge-critical { background: #991b1b; color: #ef4444; }
+
+/* Detail panel (replaces side panel on click) */
+.detail-panel { display: none; }
+.detail-panel.active { display: block; }
+.detail-back {
+    cursor: pointer; color: #60a5fa; font-size: 12px; margin-bottom: 12px;
+    display: inline-block;
+}
+.detail-back:hover { text-decoration: underline; }
+.chain-item {
+    display: flex; align-items: center; gap: 8px;
+    padding: 6px 0; border-bottom: 1px solid #1e293b;
+}
+.chain-item:last-child { border-bottom: none; }
+
+/* Loading */
+.loading { text-align: center; color: #64748b; padding: 40px; }
+</style>
+</head>
+<body>
+
+<div class="header">
+    <h1>GENESIS NEURAL MONITOR</h1>
+    <div class="meta">Last update: <span id="last-update">--</span></div>
+</div>
+
+<div class="container">
+    <div class="main-panel">
+        <div id="loading" class="loading">Connecting...</div>
+        <div id="neural-map" class="neural-map" style="display:none;"></div>
+        <div id="surplus-box" class="surplus-box" style="display:none;">
+            <h3>Surplus Compute</h3>
+            <div id="surplus-content"></div>
+        </div>
+    </div>
+    <div class="side-panel">
+        <div id="side-default">
+            <div class="section">
+                <h3>Infrastructure</h3>
+                <div id="infra-content"></div>
+            </div>
+            <div class="section">
+                <h3>CC Sessions</h3>
+                <div id="cc-content"></div>
+            </div>
+            <div class="section">
+                <h3>Queues</h3>
+                <div id="queue-content"></div>
+            </div>
+            <div class="section">
+                <h3>Cost</h3>
+                <div id="cost-content"></div>
+            </div>
+        </div>
+        <div id="side-detail" class="detail-panel">
+            <span class="detail-back" id="detail-back-btn">&larr; Back</span>
+            <div id="detail-content"></div>
+        </div>
+    </div>
+</div>
+
+<script>
+// NOTE: All data rendered in this dashboard originates from Genesis's internal
+// health API (local-only Flask server). No user-supplied or external content
+// is rendered. All dynamic content uses textContent for plain text values
+// and controlled DOM construction for structured elements.
+
+const RING_ASSIGNMENT = {
+    center: ['cc_foreground', 'cc_background'],
+    inner: [
+        '3_micro_reflection', '4_light_reflection', '5_deep_reflection',
+        '6_strategic_reflection', '27_pre_execution_assessment',
+        '10_cognitive_state', '11_user_model_synthesis'
+    ],
+    outer: [
+        '2_triage', '8_memory_consolidation', '9_fact_extraction',
+        '7_task_retrospective', '28_observation_sweep', '15_triage_calibration',
+        '30_triage_calibration', '16_quality_calibration', '31_outcome_classification',
+        '32_delta_assessment', '29_retrospective_triage'
+    ],
+};
+
+const DOT_SIZES = { center: 'dot-center', inner: 'dot-inner', outer: 'dot-outer', periphery: 'dot-periphery' };
+const FRIENDLY_NAMES = {
+    'cc_foreground': 'CC Foreground', 'cc_background': 'CC Background',
+    '2_triage': 'Triage', '3_micro_reflection': 'Micro Reflect',
+    '4_light_reflection': 'Light Reflect', '5_deep_reflection': 'Deep Reflect',
+    '6_strategic_reflection': 'Strategic', '7_task_retrospective': 'Task Retro',
+    '8_memory_consolidation': 'Memory', '9_fact_extraction': 'Fact Extract',
+    '10_cognitive_state': 'Cog State', '11_user_model_synthesis': 'User Model',
+    '12_surplus_brainstorm': 'Surplus', '13_morning_report': 'Morning Rpt',
+    '14_weekly_self_assessment': 'Weekly Self', '15_triage_calibration': 'Triage Cal',
+    '16_quality_calibration': 'Quality Cal', '17_fresh_eyes_review': 'Fresh Eyes',
+    '18_meta_prompting': 'Meta Prompt', '19_outreach_draft': 'Outreach',
+    '20_adversarial_counterargument': 'Adversarial', '21_embeddings': 'Embeddings',
+    '22_tagging': 'Tagging', '27_pre_execution_assessment': 'Pre-Exec',
+    '28_observation_sweep': 'Obs Sweep', '29_retrospective_triage': 'Retro Triage',
+    '30_triage_calibration': 'Triage Cal 2', '31_outcome_classification': 'Outcome',
+    '32_delta_assessment': 'Delta', '33_skill_refiner': 'Skill Refine',
+    '34_research_synthesis': 'Research', '35_content_draft': 'Content',
+};
+
+let lastData = null;
+let lastFetchTime = 0;
+
+document.getElementById('detail-back-btn').addEventListener('click', showDefaultPanel);
+
+function getRing(siteId) {
+    for (const [ring, ids] of Object.entries(RING_ASSIGNMENT)) {
+        if (ids.includes(siteId)) return ring;
+    }
+    return 'periphery';
+}
+
+function statusClass(status) {
+    if (status === 'healthy') return 'dot-healthy';
+    if (status === 'degraded') return 'dot-degraded';
+    if (status === 'down') return 'dot-down';
+    return 'dot-unknown';
+}
+
+function infraStatusClass(status) {
+    if (status === 'healthy') return 'status-healthy';
+    if (status === 'degraded') return 'status-degraded';
+    if (status === 'down') return 'status-down';
+    return 'status-unknown';
+}
+
+function el(tag, cls, text) {
+    const e = document.createElement(tag);
+    if (cls) e.className = cls;
+    if (text !== undefined) e.textContent = text;
+    return e;
+}
+
+function sectionRow(label, value, valueStyle) {
+    const row = el('div', 'section-row');
+    row.appendChild(el('span', 'label', label));
+    const val = el('span', 'value', value);
+    if (valueStyle) val.style.cssText = valueStyle;
+    row.appendChild(val);
+    return row;
+}
+
+function buildNeuralMap(data) {
+    const map = document.getElementById('neural-map');
+    map.replaceChildren();
+    map.style.display = 'block';
+
+    const rings = { center: [], inner: [], outer: [], periphery: [] };
+
+    const ccSessions = data.cc_sessions || {};
+    const fgStatus = (ccSessions.foreground || {}).status || 'unknown';
+    const bgStatus = (ccSessions.background || {}).status || 'unknown';
+    rings.center.push({ id: 'cc_foreground', status: fgStatus, data: ccSessions.foreground || {} });
+    rings.center.push({ id: 'cc_background', status: bgStatus, data: ccSessions.background || {} });
+
+    for (const [siteId, info] of Object.entries(data.call_sites || {})) {
+        const ring = getRing(siteId);
+        rings[ring].push({ id: siteId, status: info.status, data: info });
+    }
+
+    for (const [ringName, items] of Object.entries(rings)) {
+        const ringEl = el('div', 'ring ring-' + ringName);
+
+        for (const item of items) {
+            const sizeClass = DOT_SIZES[ringName];
+            const dot = el('div', 'dot ' + sizeClass + ' ' + statusClass(item.status));
+            dot.addEventListener('click', () => showDetail(item));
+
+            // Tooltip
+            const tooltip = el('div', 'tooltip');
+            const name = FRIENDLY_NAMES[item.id] || item.id;
+            tooltip.appendChild(el('div', 'tt-name', name));
+            if (item.data.active_provider) {
+                tooltip.appendChild(el('div', 'tt-row', 'Provider: ' + item.data.active_provider));
+            }
+            if (item.data.chain_health) {
+                const healthy = item.data.chain_health.filter(c => c.state !== 'open').length;
+                tooltip.appendChild(el('div', 'tt-row', healthy + '/' + item.data.chain_health.length + ' providers healthy'));
+            }
+            if (item.data.active !== undefined) {
+                tooltip.appendChild(el('div', 'tt-row', 'Active: ' + item.data.active));
+            }
+            if (item.data.hourly_budget) {
+                tooltip.appendChild(el('div', 'tt-row', 'Budget: ' + item.data.hourly_budget));
+            }
+            dot.appendChild(tooltip);
+
+            if (ringName === 'center' || ringName === 'inner') {
+                dot.appendChild(el('div', 'dot-label', FRIENDLY_NAMES[item.id] || item.id));
+            }
+
+            ringEl.appendChild(dot);
+        }
+        map.appendChild(ringEl);
+    }
+}
+
+function showDetail(item) {
+    document.getElementById('side-default').style.display = 'none';
+    const detail = document.getElementById('side-detail');
+    detail.classList.add('active');
+
+    const content = document.getElementById('detail-content');
+    content.replaceChildren();
+    const name = FRIENDLY_NAMES[item.id] || item.id;
+
+    const heading = el('h3', null, name);
+    heading.style.cssText = 'color:#f8fafc;margin:12px 0 8px';
+    content.appendChild(heading);
+
+    const statusColor = item.status === 'healthy' ? '#4ade80' : item.status === 'degraded' ? '#facc15' : '#ef4444';
+    content.appendChild(sectionRow('Status', item.status, 'color:' + statusColor));
+
+    if (item.data.active_provider) {
+        content.appendChild(sectionRow('Active Provider', item.data.active_provider));
+    }
+
+    if (item.data.chain_health) {
+        const chainHead = el('h3', null, 'Provider Chain');
+        chainHead.style.cssText = 'color:#94a3b8;margin:16px 0 8px;font-size:11px;text-transform:uppercase;letter-spacing:1px';
+        content.appendChild(chainHead);
+
+        for (const c of item.data.chain_health) {
+            const color = c.state === 'open' ? '#ef4444' : c.state === 'half_open' ? '#facc15' : '#4ade80';
+            const chainItem = el('div', 'chain-item');
+            const dot = el('span', 'status-dot');
+            dot.style.background = color;
+            chainItem.appendChild(dot);
+            const nameSpan = el('span', null, c.provider);
+            nameSpan.style.flex = '1';
+            chainItem.appendChild(nameSpan);
+            const stateText = c.state + (c.failures > 0 ? ' (' + c.failures + ' fails)' : '');
+            const stateSpan = el('span', null, stateText);
+            stateSpan.style.color = '#64748b';
+            chainItem.appendChild(stateSpan);
+            content.appendChild(chainItem);
+        }
+    }
+
+    if (item.data.active !== undefined) {
+        content.appendChild(sectionRow('Active Sessions', String(item.data.active)));
+    }
+    if (item.data.hourly_budget) {
+        content.appendChild(sectionRow('Hourly Budget', item.data.hourly_budget));
+    }
+}
+
+function showDefaultPanel() {
+    document.getElementById('side-detail').classList.remove('active');
+    document.getElementById('side-default').style.display = 'block';
+}
+
+function updateSidePanel(data) {
+    // Infrastructure
+    const infra = data.infrastructure || {};
+    const infraEl = document.getElementById('infra-content');
+    infraEl.replaceChildren();
+    for (const [name, info] of Object.entries(infra)) {
+        const row = el('div', 'section-row');
+        const labelSpan = el('span', 'label');
+        const dot = el('span', 'status-dot ' + infraStatusClass(info.status));
+        labelSpan.appendChild(dot);
+        labelSpan.appendChild(document.createTextNode(name));
+        row.appendChild(labelSpan);
+        const latency = info.latency_ms !== undefined ? ' (' + Math.round(info.latency_ms) + 'ms)' : '';
+        row.appendChild(el('span', 'value', info.status + latency));
+        infraEl.appendChild(row);
+    }
+    if (!Object.keys(infra).length) infraEl.appendChild(el('div', null, 'No data'));
+
+    // CC Sessions
+    const cc = data.cc_sessions || {};
+    const ccEl = document.getElementById('cc-content');
+    ccEl.replaceChildren();
+    if (cc.foreground) ccEl.appendChild(sectionRow('Foreground', (cc.foreground.active || 0) + ' active'));
+    if (cc.background) {
+        ccEl.appendChild(sectionRow('Background', (cc.background.active || 0) + ' active'));
+        if (cc.background.hourly_budget) ccEl.appendChild(sectionRow('Budget', cc.background.hourly_budget + '/hr'));
+    }
+
+    // Queues
+    const queues = data.queues || {};
+    const qEl = document.getElementById('queue-content');
+    qEl.replaceChildren();
+    for (const [name, depth] of Object.entries(queues)) {
+        const label = name.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
+        const color = depth > 100 ? 'color:#facc15' : '';
+        qEl.appendChild(sectionRow(label, String(depth), color));
+    }
+
+    // Cost
+    const cost = data.cost || {};
+    const costEl = document.getElementById('cost-content');
+    costEl.replaceChildren();
+    if (cost.daily_usd !== undefined) costEl.appendChild(sectionRow('Today', '$' + cost.daily_usd.toFixed(2)));
+    if (cost.monthly_usd !== undefined) costEl.appendChild(sectionRow('Month', '$' + cost.monthly_usd.toFixed(2)));
+    if (cost.budget_status) {
+        const cls = cost.budget_status === 'UNDER_LIMIT' ? 'badge-normal' : cost.budget_status === 'WARNING' ? 'badge-warning' : 'badge-critical';
+        const row = el('div', 'section-row');
+        row.appendChild(el('span', 'label', 'Status'));
+        row.appendChild(el('span', 'badge ' + cls, cost.budget_status));
+        costEl.appendChild(row);
+    }
+}
+
+function updateSurplus(data) {
+    const surplus = data.surplus || {};
+    const box = document.getElementById('surplus-box');
+    if (surplus.status === 'unknown') { box.style.display = 'none'; return; }
+    box.style.display = 'block';
+    const content = document.getElementById('surplus-content');
+    content.replaceChildren();
+    const color = surplus.status === 'idle' ? '#4ade80' : surplus.status === 'dispatching' ? '#facc15' : '#ef4444';
+    content.appendChild(sectionRow('Status', surplus.status, 'color:' + color + ';font-weight:600'));
+    if (surplus.queue_depth !== undefined) content.appendChild(sectionRow('Queue Depth', String(surplus.queue_depth)));
+}
+
+function tickUpdateTimer() {
+    const elapsed = Math.round((Date.now() - lastFetchTime) / 1000);
+    document.getElementById('last-update').textContent = elapsed + 's ago';
+}
+
+async function fetchHealth() {
+    try {
+        const resp = await fetch('/api/genesis/health');
+        if (!resp.ok) throw new Error('HTTP ' + resp.status);
+        lastData = await resp.json();
+        lastFetchTime = Date.now();
+
+        document.getElementById('loading').style.display = 'none';
+        buildNeuralMap(lastData);
+        updateSidePanel(lastData);
+        updateSurplus(lastData);
+    } catch (e) {
+        console.error('Health fetch failed:', e);
+        document.getElementById('loading').textContent = 'Connection error — retrying...';
+        document.getElementById('loading').style.display = 'block';
+    }
+}
+
+fetchHealth();
+setInterval(fetchHealth, 15000);
+setInterval(tickUpdateTimer, 1000);
+</script>
+</body>
+</html>
