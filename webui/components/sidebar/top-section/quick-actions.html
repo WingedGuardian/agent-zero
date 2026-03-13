@@ -31,6 +31,12 @@
         <span class="material-symbols-outlined">settings</span>
       </button>
 
+      <!-- Genesis -->
+      <button class="config-button" id="genesis-dash"
+              @click="window.location.href='/genesis'" title="Genesis">
+        <span class="material-symbols-outlined">neurology</span>
+      </button>
+
       <!-- Dropdown Toggle -->
       <button class="config-button dropdown-toggle" @click="dropdownOpen = !dropdownOpen" title="More options">
         <span class="material-symbols-outlined" :class="dropdownOpen ? 'rotated' : ''">expand_more</span>
@@ -63,7 +69,12 @@
         <span class="material-symbols-outlined">schedule</span>
         <span>Scheduler</span>
       </button>
-      
+
+      <button class="dropdown-item" @click="window.location.href='/genesis'; dropdownOpen = false">
+        <span class="material-symbols-outlined">neurology</span>
+        <span>Genesis</span>
+      </button>
+
       <button class="dropdown-item" @click="openModal('settings/settings.html'); dropdownOpen = false">
         <span class="material-symbols-outlined">settings</span>
         <span>Settings</span>
