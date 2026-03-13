@@ -58,3 +58,29 @@ class GenesisBootstrap(Extension):
                 logger.warning("Could not find Flask webapp for health blueprint")
         except Exception:
             logger.exception("Failed to register health blueprint")
+
+        # Register Genesis dashboard blueprint
+        try:
+            if webapp is not None:
+                from genesis.dashboard.api import blueprint as dash_bp
+
+                if "genesis_dashboard" not in webapp.blueprints:
+                    webapp.register_blueprint(dash_bp)
+                    logger.info("Genesis dashboard blueprint registered")
+        except Exception:
+            logger.exception("Failed to register dashboard blueprint")
+
+        # Register outreach API blueprint
+        try:
+            if webapp is not None:
+                from genesis.outreach.api import init_outreach_api, outreach_api
+                from genesis.runtime import GenesisRuntime
+
+                rt = GenesisRuntime.instance()
+                init_outreach_api(db=rt.db)
+
+                if "outreach_api" not in webapp.blueprints:
+                    webapp.register_blueprint(outreach_api)
+                    logger.info("Genesis outreach blueprint registered")
+        except Exception:
+            logger.exception("Failed to register outreach blueprint")
