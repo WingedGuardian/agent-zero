@@ -4,25 +4,27 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Genesis Neural Monitor</title>
+<link rel="stylesheet" href="/index.css">
 <style>
+:root { --color-text-secondary: var(--color-text-muted, #d4d4d4e4); }
 * { margin: 0; padding: 0; box-sizing: border-box; }
 body {
-    background: #0f172a;
-    color: #e2e8f0;
+    background: var(--color-background, #0f172a);
+    color: var(--color-text, #e2e8f0);
     font-family: 'SF Mono', 'Fira Code', 'Cascadia Code', monospace;
     font-size: 13px;
     overflow-x: hidden;
 }
 .header {
     display: flex; justify-content: space-between; align-items: center;
-    padding: 16px 24px; border-bottom: 1px solid #1e293b;
+    padding: 16px 24px; border-bottom: 1px solid var(--color-border, #1e293b);
 }
-.header h1 { font-size: 16px; font-weight: 600; letter-spacing: 2px; color: #94a3b8; }
-.header .meta { color: #64748b; font-size: 12px; }
+.header h1 { font-size: 16px; font-weight: 600; letter-spacing: 2px; color: var(--color-text-secondary); }
+.header .meta { color: var(--color-text-secondary); font-size: 12px; }
 .container { display: flex; height: calc(100vh - 52px); }
 .main-panel { flex: 1; padding: 24px; overflow-y: auto; }
 .side-panel {
-    width: 280px; min-width: 280px; border-left: 1px solid #1e293b;
+    width: 280px; min-width: 280px; border-left: 1px solid var(--color-border, #1e293b);
     padding: 16px; overflow-y: auto;
 }
 
@@ -57,18 +59,18 @@ body {
 /* Tooltip */
 .tooltip {
     display: none; position: absolute; bottom: calc(100% + 8px); left: 50%;
-    transform: translateX(-50%); background: #1e293b; border: 1px solid #334155;
+    transform: translateX(-50%); background: var(--color-panel, #1e293b); border: 1px solid var(--color-border, #334155);
     border-radius: 6px; padding: 8px 12px; white-space: nowrap; z-index: 100;
     font-size: 11px; pointer-events: none;
 }
 .dot:hover .tooltip { display: block; }
-.tooltip .tt-name { color: #f8fafc; font-weight: 600; margin-bottom: 4px; }
-.tooltip .tt-row { color: #94a3b8; }
+.tooltip .tt-name { color: var(--color-text, #f8fafc); font-weight: 600; margin-bottom: 4px; }
+.tooltip .tt-row { color: var(--color-text-secondary); }
 
 /* Dot labels */
 .dot-label {
     position: absolute; top: calc(100% + 2px); left: 50%;
-    transform: translateX(-50%); font-size: 8px; color: #64748b;
+    transform: translateX(-50%); font-size: 8px; color: var(--color-text-secondary);
     white-space: nowrap; pointer-events: none; text-align: center;
     max-width: 60px; overflow: hidden; text-overflow: ellipsis;
 }
@@ -76,20 +78,20 @@ body {
 
 /* Surplus box */
 .surplus-box {
-    background: #1e293b; border: 1px solid #334155; border-radius: 8px;
+    background: var(--color-panel, #1e293b); border: 1px solid var(--color-border, #334155); border-radius: 8px;
     padding: 12px 16px; margin-top: 24px; max-width: 600px; margin-left: auto; margin-right: auto;
 }
-.surplus-box h3 { font-size: 12px; color: #94a3b8; margin-bottom: 8px; text-transform: uppercase; letter-spacing: 1px; }
-.surplus-row { display: flex; justify-content: space-between; color: #cbd5e1; margin: 4px 0; }
+.surplus-box h3 { font-size: 12px; color: var(--color-text-secondary); margin-bottom: 8px; text-transform: uppercase; letter-spacing: 1px; }
+.surplus-row { display: flex; justify-content: space-between; color: var(--color-text, #cbd5e1); margin: 4px 0; }
 
 /* Side panel sections */
 .section { margin-bottom: 20px; }
 .section h3 {
     font-size: 11px; text-transform: uppercase; letter-spacing: 1px;
-    color: #64748b; margin-bottom: 8px; padding-bottom: 4px; border-bottom: 1px solid #1e293b;
+    color: var(--color-text-secondary); margin-bottom: 8px; padding-bottom: 4px; border-bottom: 1px solid var(--color-border, #1e293b);
 }
 .section-row { display: flex; justify-content: space-between; align-items: center; padding: 3px 0; }
-.section-row .label { color: #94a3b8; }
+.section-row .label { color: var(--color-text-secondary); }
 .section-row .value { font-weight: 600; }
 
 .status-dot {
@@ -119,24 +121,24 @@ body {
 .detail-back:hover { text-decoration: underline; }
 .chain-item {
     display: flex; align-items: center; gap: 8px;
-    padding: 6px 0; border-bottom: 1px solid #1e293b;
+    padding: 6px 0; border-bottom: 1px solid var(--color-border, #1e293b);
 }
 .chain-item:last-child { border-bottom: none; }
 
 /* Loading */
-.loading { text-align: center; color: #64748b; padding: 40px; }
+.loading { text-align: center; color: var(--color-text-secondary); padding: 40px; }
 
 /* Nav bar */
 .genesis-nav {
     display: flex; gap: 1.5rem; padding: 0.5rem 24px;
-    border-bottom: 1px solid #1e293b;
+    border-bottom: 1px solid var(--color-border, #1e293b);
 }
 .genesis-nav a {
-    color: #64748b; text-decoration: none; font-size: 12px;
+    color: var(--color-text-secondary); text-decoration: none; font-size: 0.85rem;
     padding: 0.3rem 0;
 }
-.genesis-nav a:hover { color: #e2e8f0; }
-.genesis-nav a.active { color: #94a3b8; border-bottom: 2px solid #94a3b8; }
+.genesis-nav a:hover { color: var(--color-text); }
+.genesis-nav a.active { color: var(--color-accent, #cf6679); border-bottom: 2px solid var(--color-accent, #cf6679); }
 </style>
 </head>
 <body>
