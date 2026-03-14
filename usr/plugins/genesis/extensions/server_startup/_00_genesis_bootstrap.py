@@ -67,6 +67,15 @@ class GenesisBootstrap(Extension):
                 if "genesis_dashboard" not in webapp.blueprints:
                     webapp.register_blueprint(dash_bp)
                     logger.info("Genesis dashboard blueprint registered")
+
+                # Start dashboard heartbeat
+                try:
+                    from genesis.dashboard.heartbeat import DashboardHeartbeat
+
+                    _heartbeat = DashboardHeartbeat(interval_seconds=60)
+                    _heartbeat.start()
+                except Exception:
+                    logger.exception("Failed to start dashboard heartbeat")
         except Exception:
             logger.exception("Failed to register dashboard blueprint")
 
