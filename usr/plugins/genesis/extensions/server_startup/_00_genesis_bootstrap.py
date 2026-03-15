@@ -79,6 +79,19 @@ class GenesisBootstrap(Extension):
         except Exception:
             logger.exception("Failed to register dashboard blueprint")
 
+        # Register Genesis UI overlay blueprint
+        try:
+            if webapp is not None:
+                from genesis.ui.blueprint import blueprint as ui_bp
+                from genesis.ui.blueprint import register_injection
+
+                if "genesis_ui" not in webapp.blueprints:
+                    webapp.register_blueprint(ui_bp)
+                    register_injection(webapp)
+                    logger.info("Genesis UI overlay blueprint registered")
+        except Exception:
+            logger.exception("Failed to register UI overlay blueprint")
+
         # Register outreach API blueprint
         try:
             if webapp is not None:
