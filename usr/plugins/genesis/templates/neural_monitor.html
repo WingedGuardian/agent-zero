@@ -139,7 +139,7 @@ body {
     padding: 0.3rem 0;
 }
 .genesis-nav a:hover { color: var(--color-text); }
-.genesis-nav a.active { color: var(--color-accent, #cf6679); border-bottom: 2px solid var(--color-accent, #cf6679); }
+.genesis-nav a.active { color: var(--color-accent, #27875e); border-bottom: 2px solid var(--color-accent, #27875e); }
 </style>
 </head>
 <body>
@@ -168,8 +168,16 @@ body {
     <div class="side-panel">
         <div id="side-default">
             <div class="section">
+                <h3>Awareness Loop</h3>
+                <div id="awareness-content"></div>
+            </div>
+            <div class="section">
                 <h3>Infrastructure</h3>
                 <div id="infra-content"></div>
+            </div>
+            <div class="section">
+                <h3>Resilience</h3>
+                <div id="resilience-content"></div>
             </div>
             <div class="section">
                 <h3>CC Sessions</h3>
@@ -208,7 +216,14 @@ const RING_ASSIGNMENT = {
         '2_triage', '8_memory_consolidation', '9_fact_extraction',
         '7_task_retrospective', '28_observation_sweep', '15_triage_calibration',
         '30_triage_calibration', '16_quality_calibration', '31_outcome_classification',
-        '32_delta_assessment', '29_retrospective_triage'
+        '32_delta_assessment', '29_retrospective_triage',
+        '20_adversarial_counterargument', '21_embeddings', '22_tagging'
+    ],
+    periphery: [
+        '12_surplus_brainstorm', '13_morning_report', '14_weekly_self_assessment',
+        '17_fresh_eyes_review', '18_meta_prompting', '19_outreach_draft',
+        '23_fresh_eyes_review', '33_skill_refiner', '34_research_synthesis',
+        '35_content_draft'
     ],
 };
 
@@ -251,10 +266,17 @@ function statusClass(status) {
     return 'dot-unknown';
 }
 
-function infraStatusClass(status) {
+function infraStatusClass(probe) {
+    const status = typeof probe === 'string' ? probe : probe?.status;
     if (status === 'healthy') return 'status-healthy';
     if (status === 'degraded') return 'status-degraded';
     if (status === 'down') return 'status-down';
+    // Disk: derive from free_pct
+    if (probe?.free_pct != null) {
+        if (probe.free_pct > 20) return 'status-healthy';
+        if (probe.free_pct > 10) return 'status-degraded';
+        return 'status-down';
+    }
     return 'status-unknown';
 }
 
@@ -392,15 +414,47 @@ function updateSidePanel(data) {
     for (const [name, info] of Object.entries(infra)) {
         const row = el('div', 'section-row');
         const labelSpan = el('span', 'label');
-        const dot = el('span', 'status-dot ' + infraStatusClass(info.status));
+        const dot = el('span', 'status-dot ' + infraStatusClass(info));
         labelSpan.appendChild(dot);
         labelSpan.appendChild(document.createTextNode(name));
         row.appendChild(labelSpan);
-        const latency = info.latency_ms !== undefined ? ' (' + Math.round(info.latency_ms) + 'ms)' : '';
-        row.appendChild(el('span', 'value', info.status + latency));
+        // Show appropriate detail based on probe type
+        let detail = '';
+        if (info.latency_ms !== undefined) {
+            detail = (info.status || 'ok') + ' (' + Math.round(info.latency_ms) + 'ms)';
+        } else if (info.free_pct !== undefined) {
+            detail = info.free_gb.toFixed(1) + ' GB free (' + Math.round(info.free_pct) + '%)';
+        } else {
+            detail = info.status || 'ok';
+        }
+        row.appendChild(el('span', 'value', detail));
         infraEl.appendChild(row);
     }
     if (!Object.keys(infra).length) infraEl.appendChild(el('div', null, 'No data'));
+
+    // Awareness Loop
+    const awareness = data.awareness || {};
+    const awarenessEl = document.getElementById('awareness-content');
+    if (awarenessEl) {
+        awarenessEl.replaceChildren();
+        const aStatus = awareness.status || 'unknown';
+        const aColor = aStatus === 'healthy' ? 'color:#4ade80' : aStatus === 'stale' ? 'color:#facc15' : 'color:#6b7280';
+        awarenessEl.appendChild(sectionRow('Status', aStatus, aColor + ';font-weight:600'));
+        if (awareness.ticks_24h !== undefined) awarenessEl.appendChild(sectionRow('Ticks/24h', String(awareness.ticks_24h)));
+        if (awareness.time_since_last_tick_seconds !== undefined) {
+            const secs = Math.round(awareness.time_since_last_tick_seconds);
+            awarenessEl.appendChild(sectionRow('Last tick', secs < 120 ? secs + 's ago' : Math.round(secs / 60) + 'm ago'));
+        }
+    }
+
+    // Resilience
+    const resEl = document.getElementById('resilience-content');
+    if (resEl) {
+        resEl.replaceChildren();
+        const resState = data.resilience || 'unknown';
+        const rColor = resState === 'normal' ? 'color:#4ade80' : 'color:#facc15';
+        resEl.appendChild(sectionRow('State', String(resState), rColor + ';font-weight:600'));
+    }
 
     // CC Sessions
     const cc = data.cc_sessions || {};
@@ -417,8 +471,9 @@ function updateSidePanel(data) {
     const qEl = document.getElementById('queue-content');
     qEl.replaceChildren();
     for (const [name, depth] of Object.entries(queues)) {
+        if (typeof depth !== 'number') continue;
         const label = name.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
-        const color = depth > 100 ? 'color:#facc15' : '';
+        const color = depth > 0 ? 'color:#facc15' : 'color:#4ade80';
         qEl.appendChild(sectionRow(label, String(depth), color));
     }
 
@@ -426,8 +481,8 @@ function updateSidePanel(data) {
     const cost = data.cost || {};
     const costEl = document.getElementById('cost-content');
     costEl.replaceChildren();
-    if (cost.daily_usd !== undefined) costEl.appendChild(sectionRow('Today', '$' + cost.daily_usd.toFixed(2)));
     if (cost.monthly_usd !== undefined) costEl.appendChild(sectionRow('Month', '$' + cost.monthly_usd.toFixed(2)));
+    if (cost.daily_usd !== undefined) costEl.appendChild(sectionRow('Today', '$' + cost.daily_usd.toFixed(3)));
     if (cost.budget_status) {
         const cls = cost.budget_status === 'UNDER_LIMIT' ? 'badge-normal' : cost.budget_status === 'WARNING' ? 'badge-warning' : 'badge-critical';
         const row = el('div', 'section-row');
