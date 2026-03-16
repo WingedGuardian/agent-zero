@@ -28,29 +28,24 @@ body {
     padding: 16px; overflow-y: auto;
 }
 
-/* Neural Map */
+/* Neural Map — radial layout using polar coordinates */
 .neural-map {
-    position: relative; width: 100%; max-width: 800px;
-    margin: 0 auto; aspect-ratio: 1;
-    min-height: 500px;
+    position: relative; width: 100%;
+    margin: 0 auto;
+    min-height: 600px;
 }
-.ring { position: absolute; display: flex; flex-wrap: wrap; justify-content: center; align-content: center; align-items: center; gap: 12px; }
-.ring-center { top: 35%; left: 35%; width: 30%; height: 30%; }
-.ring-inner { top: 20%; left: 20%; width: 60%; height: 60%; }
-.ring-outer { top: 8%; left: 8%; width: 84%; height: 84%; }
-.ring-periphery { top: 0; left: 0; width: 100%; height: 100%; }
 
 .dot {
-    border-radius: 50%; cursor: pointer; position: relative;
+    border-radius: 50%; cursor: pointer;
+    position: absolute;
     transition: background-color 0.3s, transform 0.15s;
     display: flex; align-items: center; justify-content: center;
-    flex-shrink: 0;
 }
-.dot:hover { transform: scale(1.3); z-index: 10; }
-.dot-center { width: 28px; height: 28px; }
-.dot-inner { width: 18px; height: 18px; }
-.dot-outer { width: 13px; height: 13px; }
-.dot-periphery { width: 9px; height: 9px; }
+.dot:hover { transform: scale(1.4); z-index: 10; }
+.dot-center { width: 32px; height: 32px; }
+.dot-inner { width: 20px; height: 20px; }
+.dot-outer { width: 14px; height: 14px; }
+.dot-periphery { width: 10px; height: 10px; }
 
 .dot-healthy { background: #4ade80; }
 .dot-degraded { background: #facc15; }
@@ -301,6 +296,21 @@ function buildNeuralMap(data) {
     map.replaceChildren();
     map.style.display = 'block';
 
+    // Compute map dimensions from container
+    const mapW = map.clientWidth || 700;
+    const mapH = Math.max(map.clientHeight, 600);
+    const cx = mapW / 2;
+    const cy = mapH / 2;
+
+    // Ring radii as fraction of the smaller dimension
+    const minDim = Math.min(mapW, mapH);
+    const radii = {
+        center: minDim * 0.06,
+        inner: minDim * 0.18,
+        outer: minDim * 0.30,
+        periphery: minDim * 0.42,
+    };
+
     const rings = { center: [], inner: [], outer: [], periphery: [] };
 
     const ccSessions = data.cc_sessions || {};
@@ -315,11 +325,20 @@ function buildNeuralMap(data) {
     }
 
     for (const [ringName, items] of Object.entries(rings)) {
-        const ringEl = el('div', 'ring ring-' + ringName);
+        const radius = radii[ringName];
+        const sizeClass = DOT_SIZES[ringName];
 
-        for (const item of items) {
-            const sizeClass = DOT_SIZES[ringName];
+        for (let i = 0; i < items.length; i++) {
+            const item = items[i];
+            // Distribute evenly around the circle, starting from top (-π/2)
+            const angle = (i / items.length) * 2 * Math.PI - Math.PI / 2;
+            const x = cx + radius * Math.cos(angle);
+            const y = cy + radius * Math.sin(angle);
+
             const dot = el('div', 'dot ' + sizeClass + ' ' + statusClass(item.status));
+            dot.style.left = x + 'px';
+            dot.style.top = y + 'px';
+            dot.style.transform = 'translate(-50%, -50%)';
             dot.addEventListener('click', () => showDetail(item));
 
             // Tooltip
@@ -341,13 +360,13 @@ function buildNeuralMap(data) {
             }
             dot.appendChild(tooltip);
 
+            // Labels for center and inner rings
             if (ringName === 'center' || ringName === 'inner') {
                 dot.appendChild(el('div', 'dot-label', FRIENDLY_NAMES[item.id] || item.id));
             }
 
-            ringEl.appendChild(dot);
+            map.appendChild(dot);
         }
-        map.appendChild(ringEl);
     }
 }
 
