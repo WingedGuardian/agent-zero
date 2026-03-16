@@ -726,6 +726,8 @@ function updateSidePanel(data) {
     const infraEl = document.getElementById('infra-content');
     infraEl.replaceChildren();
     for (const [name, info] of Object.entries(infra)) {
+        // tmpfs is rendered in the Services section — skip here to avoid duplication
+        if (name === 'tmpfs') continue;
         const row = el('div', 'section-row');
         const labelSpan = el('span', 'label');
         const dot = el('span', 'status-dot ' + infraStatusClass(info));
@@ -736,7 +738,12 @@ function updateSidePanel(data) {
         if (info.latency_ms !== undefined) {
             detail = (info.status || 'ok') + ' (' + Math.round(info.latency_ms) + 'ms)';
         } else if (info.free_pct !== undefined) {
-            detail = info.free_gb.toFixed(1) + ' GB free (' + Math.round(info.free_pct) + '%)';
+            const freeVal = info.free_gb != null
+                ? info.free_gb.toFixed(1) + ' GB'
+                : info.free_mb != null
+                ? Math.round(info.free_mb) + ' MB'
+                : '?';
+            detail = freeVal + ' free (' + Math.round(info.free_pct) + '%)';
         } else {
             detail = info.status || 'ok';
         }
