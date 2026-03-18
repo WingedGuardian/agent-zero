@@ -168,16 +168,83 @@ body {
     margin-bottom: 8px;
 }
 
-/* GROUNDWORK(model-routing-ui): Config button placeholder for future routing configuration UI */
-.config-placeholder {
-    margin-top: 16px; padding: 12px; border: 1px dashed var(--color-border, #334155);
-    border-radius: 6px; text-align: center;
+/* Routing config editor */
+.config-editor {
+    margin-top: 16px; padding: 12px; border: 1px solid var(--color-border, #334155);
+    border-radius: 6px; background: rgba(15, 23, 42, 0.5);
 }
-.config-placeholder button {
-    background: var(--color-border, #334155); color: #64748b; border: none;
-    padding: 6px 16px; border-radius: 4px; font-size: 11px; cursor: not-allowed;
+.config-editor .chain-editor-list {
+    list-style: none; padding: 0; margin: 8px 0;
 }
-.config-placeholder .coming-soon { font-size: 10px; color: #475569; margin-top: 4px; }
+.config-editor .chain-editor-item {
+    display: flex; align-items: center; gap: 8px; padding: 6px 8px;
+    background: rgba(30, 41, 59, 0.8); border-radius: 4px; margin-bottom: 4px;
+    font-size: 12px;
+}
+.config-editor .chain-editor-item .provider-name { flex: 1; }
+.config-editor .chain-editor-item .cb-dot {
+    width: 8px; height: 8px; border-radius: 50%; display: inline-block; flex-shrink: 0;
+}
+.config-editor .chain-editor-item .move-btn,
+.config-editor .chain-editor-item .remove-btn {
+    background: none; border: none; cursor: pointer; font-size: 12px; padding: 2px 4px;
+    color: #64748b; border-radius: 3px;
+}
+.config-editor .chain-editor-item .move-btn:hover { color: #e2e8f0; background: rgba(100,116,139,0.3); }
+.config-editor .chain-editor-item .remove-btn:hover { color: #ef4444; background: rgba(239,68,68,0.15); }
+.config-editor .editor-actions {
+    display: flex; gap: 8px; margin-top: 8px; align-items: center;
+}
+.config-editor .editor-actions select {
+    flex: 1; background: #1e293b; color: #e2e8f0; border: 1px solid #334155;
+    border-radius: 4px; padding: 4px 8px; font-size: 11px;
+}
+.config-editor .editor-actions button {
+    padding: 4px 12px; border-radius: 4px; font-size: 11px; cursor: pointer; border: none;
+}
+.config-editor .btn-add { background: #334155; color: #e2e8f0; }
+.config-editor .btn-add:hover { background: #475569; }
+.config-editor .btn-save { background: #22c55e; color: #0f172a; font-weight: 600; }
+.config-editor .btn-save:hover { background: #16a34a; }
+.config-editor .btn-save:disabled { background: #334155; color: #64748b; cursor: not-allowed; }
+.config-editor .btn-revert { background: #334155; color: #94a3b8; }
+.config-editor .btn-revert:hover { background: #475569; }
+.config-editor .editor-toggles {
+    display: flex; gap: 12px; margin-top: 8px; font-size: 11px; color: #94a3b8;
+}
+.config-editor .editor-toggles label { display: flex; align-items: center; gap: 4px; cursor: pointer; }
+.config-editor .editor-feedback {
+    font-size: 11px; margin-top: 6px; padding: 4px 8px; border-radius: 4px;
+}
+.config-editor .feedback-ok { background: rgba(34,197,94,0.15); color: #4ade80; }
+.config-editor .feedback-err { background: rgba(239,68,68,0.15); color: #f87171; }
+
+/* Discarded items */
+.discarded-toggle {
+    cursor: pointer; color: #ef4444; font-size: 11px; font-weight: 600;
+    padding: 4px 0; display: flex; justify-content: space-between; align-items: center;
+    margin-top: 8px; border-top: 1px solid rgba(239, 68, 68, 0.2); padding-top: 8px;
+}
+.discarded-toggle:hover { text-decoration: underline; }
+.discarded-toggle .arrow { font-size: 8px; transition: transform 0.2s; }
+.discarded-toggle .arrow.open { transform: rotate(90deg); }
+.discarded-details { display: none; margin-top: 4px; }
+.discarded-details.open { display: block; }
+.discarded-item {
+    background: rgba(239, 68, 68, 0.06); border: 1px solid rgba(239, 68, 68, 0.15);
+    border-radius: 4px; padding: 8px; margin: 4px 0; font-size: 11px;
+}
+.discarded-item .di-header { font-weight: 600; color: var(--color-text, #e2e8f0); margin-bottom: 4px; }
+.discarded-item .di-row { color: var(--color-text-secondary); font-size: 10px; margin: 2px 0; }
+.discarded-item .di-error { color: #ef4444; font-size: 10px; margin: 4px 0; }
+.discarded-item .di-actions { text-align: right; margin-top: 6px; }
+.clear-btn {
+    background: rgba(239, 68, 68, 0.12); color: #ef4444; border: 1px solid rgba(239, 68, 68, 0.25);
+    border-radius: 3px; padding: 2px 10px; font-size: 10px; cursor: pointer;
+    font-family: inherit;
+}
+.clear-btn:hover { background: rgba(239, 68, 68, 0.25); }
+.clear-all-btn { margin-top: 8px; width: 100%; padding: 4px 10px; }
 
 /* Loading */
 .loading { text-align: center; color: var(--color-text-secondary); padding: 40px; }
@@ -486,6 +553,13 @@ function el(tag, cls, text) {
     return e;
 }
 
+function formatAge(seconds) {
+    if (seconds == null) return '';
+    if (seconds < 120) return Math.round(seconds) + 's';
+    if (seconds < 7200) return Math.round(seconds / 60) + 'm';
+    return (seconds / 3600).toFixed(1) + 'h';
+}
+
 function sectionRow(label, value, valueStyle) {
     const row = el('div', 'section-row');
     row.appendChild(el('span', 'label', label));
@@ -670,13 +744,332 @@ function showDetail(item) {
         content.appendChild(sectionRow('Hourly Budget', item.data.hourly_budget));
     }
 
-    // GROUNDWORK(model-routing-ui): Configuration placeholder
-    const configDiv = el('div', 'config-placeholder');
-    const configBtn = el('button', null, 'Configure Routing');
-    configBtn.disabled = true;
-    configDiv.appendChild(configBtn);
-    configDiv.appendChild(el('div', 'coming-soon', 'Configuration UI coming soon'));
-    content.appendChild(configDiv);
+    // Last run info
+    if (item.data.last_run_at) {
+        const lastRunSection = el('div', 'chain-section');
+        lastRunSection.appendChild(el('div', 'chain-label', 'Last Run'));
+        const runTime = new Date(item.data.last_run_at);
+        const runStr = runTime.toLocaleDateString('en-US', {month: 'short', day: 'numeric'})
+            + ' ' + runTime.toLocaleTimeString('en-US', {hour12: false, hour: '2-digit', minute: '2-digit'});
+        lastRunSection.appendChild(sectionRow('Time', runStr));
+        if (item.data.last_run_provider) {
+            lastRunSection.appendChild(sectionRow('Provider', item.data.last_run_provider + (item.data.last_run_model ? ' (' + item.data.last_run_model + ')' : '')));
+        }
+        if (item.data.last_run_tokens) {
+            lastRunSection.appendChild(sectionRow('Tokens', String(item.data.last_run_tokens)));
+        }
+        content.appendChild(lastRunSection);
+
+        // Full response in scrollable box
+        if (item.data.last_response) {
+            const respSection = el('div', 'chain-section');
+            respSection.appendChild(el('div', 'chain-label', 'Last Response'));
+            const respBox = document.createElement('pre');
+            respBox.textContent = item.data.last_response;
+            respBox.style.cssText = 'font-size: 11px; max-height: 200px; overflow-y: auto; background: #1e293b; padding: 8px; border-radius: 4px; white-space: pre-wrap; word-break: break-word; margin: 4px 0; color: #e2e8f0;';
+            respSection.appendChild(respBox);
+            content.appendChild(respSection);
+        }
+    } else {
+        content.appendChild(sectionRow('Last Run', 'No runs recorded'));
+    }
+
+    // Routing config editor — loads live config from API
+    if (item.data.chain_health && item.data.chain_health.length > 0) {
+        const editorDiv = el('div', 'config-editor');
+        editorDiv.appendChild(el('div', 'chain-label', 'Routing Config'));
+
+        // Static info
+        const costPolicy = SITE_META[item.id]?.costPolicy || 'unknown';
+        const frequency = SITE_META[item.id]?.frequency || 'unknown';
+        editorDiv.appendChild(sectionRow('Cost Policy', costPolicy));
+        editorDiv.appendChild(sectionRow('Frequency', frequency));
+
+        // Chain editor placeholder — populated async
+        const chainList = document.createElement('ul');
+        chainList.className = 'chain-editor-list';
+        const loadingLi = document.createElement('li');
+        loadingLi.style.cssText = 'color:#64748b;font-size:11px;';
+        loadingLi.textContent = 'Loading config...';
+        chainList.appendChild(loadingLi);
+        editorDiv.appendChild(chainList);
+
+        // Action row: add provider dropdown + add button
+        const actionsDiv = el('div', 'editor-actions');
+        const addSelect = document.createElement('select');
+        const defaultOpt = document.createElement('option');
+        defaultOpt.value = '';
+        defaultOpt.textContent = 'Add provider...';
+        addSelect.appendChild(defaultOpt);
+        actionsDiv.appendChild(addSelect);
+        const addBtn = document.createElement('button');
+        addBtn.className = 'btn-add';
+        addBtn.textContent = 'Add';
+        actionsDiv.appendChild(addBtn);
+        editorDiv.appendChild(actionsDiv);
+
+        // Toggles row
+        const togglesDiv = el('div', 'editor-toggles');
+        const dpLabel = document.createElement('label');
+        const dpCheck = document.createElement('input');
+        dpCheck.type = 'checkbox';
+        dpLabel.appendChild(dpCheck);
+        dpLabel.appendChild(document.createTextNode(' default_paid'));
+        togglesDiv.appendChild(dpLabel);
+        const npLabel = document.createElement('label');
+        const npCheck = document.createElement('input');
+        npCheck.type = 'checkbox';
+        npLabel.appendChild(npCheck);
+        npLabel.appendChild(document.createTextNode(' never_pays'));
+        togglesDiv.appendChild(npLabel);
+        editorDiv.appendChild(togglesDiv);
+
+        // Save / Revert buttons
+        const saveRow = el('div', 'editor-actions');
+        const saveBtn = document.createElement('button');
+        saveBtn.className = 'btn-save';
+        saveBtn.textContent = 'Save';
+        saveBtn.disabled = true;
+        saveRow.appendChild(saveBtn);
+        const revertBtn = document.createElement('button');
+        revertBtn.className = 'btn-revert';
+        revertBtn.textContent = 'Revert';
+        revertBtn.disabled = true;
+        saveRow.appendChild(revertBtn);
+        editorDiv.appendChild(saveRow);
+
+        // Feedback area
+        const feedbackDiv = el('div', 'editor-feedback');
+        feedbackDiv.style.display = 'none';
+        editorDiv.appendChild(feedbackDiv);
+
+        content.appendChild(editorDiv);
+
+        // Load config from API and populate editor
+        _loadChainEditor(item.id, chainList, addSelect, addBtn, dpCheck, npCheck, saveBtn, revertBtn, feedbackDiv);
+    }
+}
+
+// ── Chain editor logic ───────────────────────────────────────────────
+
+let _editorState = {};  // {chain, originalChain, allProviders, cbStates, default_paid, never_pays, original_dp, original_np}
+
+async function _loadChainEditor(callSiteId, listEl, selectEl, addBtn, dpCheck, npCheck, saveBtn, revertBtn, feedbackEl) {
+    try {
+        const resp = await fetch('/api/genesis/routing/config');
+        if (!resp.ok) throw new Error('API error');
+        const cfg = await resp.json();
+
+        const site = cfg.call_sites[callSiteId];
+        if (!site) {
+            listEl.textContent = '';
+            const noSiteLi = document.createElement('li');
+            noSiteLi.style.cssText = 'color:#64748b;font-size:11px;';
+            noSiteLi.textContent = 'Not a router call site';
+            listEl.appendChild(noSiteLi);
+            return;
+        }
+
+        _editorState = {
+            callSiteId,
+            chain: [...site.chain],
+            originalChain: [...site.chain],
+            allProviders: cfg.providers,
+            cbStates: cfg.cb_states || {},
+            default_paid: site.default_paid,
+            never_pays: site.never_pays,
+            original_dp: site.default_paid,
+            original_np: site.never_pays,
+        };
+
+        dpCheck.checked = site.default_paid;
+        npCheck.checked = site.never_pays;
+
+        _renderChainList(listEl);
+        _populateAddSelect(selectEl);
+        _updateDirtyState(saveBtn, revertBtn);
+
+        // Event handlers
+        addBtn.onclick = () => {
+            if (selectEl.value) {
+                _editorState.chain.push(selectEl.value);
+                _renderChainList(listEl);
+                _populateAddSelect(selectEl);
+                _updateDirtyState(saveBtn, revertBtn);
+            }
+        };
+
+        dpCheck.onchange = () => {
+            _editorState.default_paid = dpCheck.checked;
+            _updateDirtyState(saveBtn, revertBtn);
+        };
+        npCheck.onchange = () => {
+            _editorState.never_pays = npCheck.checked;
+            _updateDirtyState(saveBtn, revertBtn);
+        };
+
+        saveBtn.onclick = () => _saveConfig(saveBtn, feedbackEl, listEl, selectEl, revertBtn);
+        revertBtn.onclick = () => {
+            _editorState.chain = [..._editorState.originalChain];
+            _editorState.default_paid = _editorState.original_dp;
+            _editorState.never_pays = _editorState.original_np;
+            dpCheck.checked = _editorState.original_dp;
+            npCheck.checked = _editorState.original_np;
+            _renderChainList(listEl);
+            _populateAddSelect(selectEl);
+            _updateDirtyState(saveBtn, revertBtn);
+            feedbackEl.style.display = 'none';
+        };
+    } catch (e) {
+        listEl.textContent = '';
+        const errLi = document.createElement('li');
+        errLi.style.cssText = 'color:#f87171;font-size:11px;';
+        errLi.textContent = 'Failed to load config';
+        listEl.appendChild(errLi);
+    }
+}
+
+function _renderChainList(listEl) {
+    while (listEl.firstChild) listEl.removeChild(listEl.firstChild);
+    _editorState.chain.forEach((prov, idx) => {
+        const li = document.createElement('li');
+        li.className = 'chain-editor-item';
+
+        // CB health dot
+        const dot = document.createElement('span');
+        dot.className = 'cb-dot';
+        const cbState = _editorState.cbStates[prov] || 'closed';
+        dot.style.background = cbState === 'open' ? '#ef4444' : cbState === 'half_open' ? '#facc15' : '#4ade80';
+        dot.title = cbState;
+        li.appendChild(dot);
+
+        // Free badge
+        const provCfg = _editorState.allProviders[prov];
+        const nameText = prov + (provCfg?.free ? ' [free]' : '');
+        const nameSpan = el('span', 'provider-name', nameText);
+        if (provCfg?.free) nameSpan.style.color = '#4ade80';
+        li.appendChild(nameSpan);
+
+        // Move up
+        if (idx > 0) {
+            const upBtn = document.createElement('button');
+            upBtn.className = 'move-btn';
+            upBtn.textContent = '\u25B2';
+            upBtn.title = 'Move up';
+            upBtn.onclick = () => {
+                [_editorState.chain[idx - 1], _editorState.chain[idx]] = [_editorState.chain[idx], _editorState.chain[idx - 1]];
+                _renderChainList(listEl);
+                const editor = listEl.closest('.config-editor');
+                if (editor) {
+                    const btns = editor.querySelectorAll('.editor-actions button');
+                    _updateDirtyState(btns[btns.length - 2], btns[btns.length - 1]);
+                }
+            };
+            li.appendChild(upBtn);
+        }
+
+        // Move down
+        if (idx < _editorState.chain.length - 1) {
+            const downBtn = document.createElement('button');
+            downBtn.className = 'move-btn';
+            downBtn.textContent = '\u25BC';
+            downBtn.title = 'Move down';
+            downBtn.onclick = () => {
+                [_editorState.chain[idx], _editorState.chain[idx + 1]] = [_editorState.chain[idx + 1], _editorState.chain[idx]];
+                _renderChainList(listEl);
+                const editor = listEl.closest('.config-editor');
+                if (editor) {
+                    const btns = editor.querySelectorAll('.editor-actions button');
+                    _updateDirtyState(btns[btns.length - 2], btns[btns.length - 1]);
+                }
+            };
+            li.appendChild(downBtn);
+        }
+
+        // Remove (only if chain has >1)
+        if (_editorState.chain.length > 1) {
+            const rmBtn = document.createElement('button');
+            rmBtn.className = 'remove-btn';
+            rmBtn.textContent = '\u2715';
+            rmBtn.title = 'Remove';
+            rmBtn.onclick = () => {
+                _editorState.chain.splice(idx, 1);
+                _renderChainList(listEl);
+                const selectEl = listEl.parentElement.querySelector('select');
+                if (selectEl) _populateAddSelect(selectEl);
+                const editor = listEl.closest('.config-editor');
+                if (editor) {
+                    const btns = editor.querySelectorAll('.editor-actions button');
+                    _updateDirtyState(btns[btns.length - 2], btns[btns.length - 1]);
+                }
+            };
+            li.appendChild(rmBtn);
+        }
+
+        listEl.appendChild(li);
+    });
+}
+
+function _populateAddSelect(selectEl) {
+    while (selectEl.firstChild) selectEl.removeChild(selectEl.firstChild);
+    const defaultOpt = document.createElement('option');
+    defaultOpt.value = '';
+    defaultOpt.textContent = 'Add provider...';
+    selectEl.appendChild(defaultOpt);
+    for (const [name, prov] of Object.entries(_editorState.allProviders)) {
+        if (!_editorState.chain.includes(name)) {
+            const opt = document.createElement('option');
+            opt.value = name;
+            opt.textContent = name + (prov.free ? ' [free]' : '');
+            selectEl.appendChild(opt);
+        }
+    }
+}
+
+function _updateDirtyState(saveBtn, revertBtn) {
+    const chainChanged = JSON.stringify(_editorState.chain) !== JSON.stringify(_editorState.originalChain);
+    const dpChanged = _editorState.default_paid !== _editorState.original_dp;
+    const npChanged = _editorState.never_pays !== _editorState.original_np;
+    const dirty = chainChanged || dpChanged || npChanged;
+    saveBtn.disabled = !dirty;
+    revertBtn.disabled = !dirty;
+}
+
+async function _saveConfig(saveBtn, feedbackEl, listEl, selectEl, revertBtn) {
+    saveBtn.disabled = true;
+    saveBtn.textContent = 'Saving...';
+    feedbackEl.style.display = 'none';
+
+    try {
+        const resp = await fetch('/api/genesis/routing/config/' + encodeURIComponent(_editorState.callSiteId), {
+            method: 'PUT',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({
+                chain: _editorState.chain,
+                default_paid: _editorState.default_paid,
+                never_pays: _editorState.never_pays,
+            }),
+        });
+        const data = await resp.json();
+        if (!resp.ok) throw new Error(data.error || 'Save failed');
+
+        // Update original state
+        _editorState.originalChain = [..._editorState.chain];
+        _editorState.original_dp = _editorState.default_paid;
+        _editorState.original_np = _editorState.never_pays;
+
+        feedbackEl.textContent = 'Saved + reloaded';
+        feedbackEl.className = 'editor-feedback feedback-ok';
+        feedbackEl.style.display = 'block';
+        setTimeout(() => feedbackEl.style.display = 'none', 3000);
+    } catch (e) {
+        feedbackEl.textContent = e.message;
+        feedbackEl.className = 'editor-feedback feedback-err';
+        feedbackEl.style.display = 'block';
+    }
+
+    saveBtn.textContent = 'Save';
+    _updateDirtyState(saveBtn, revertBtn);
 }
 
 function showDefaultPanel() {
@@ -833,12 +1226,31 @@ function updateSidePanel(data) {
     const queues = data.queues || {};
     const qEl = document.getElementById('queue-content');
     qEl.replaceChildren();
-    for (const [name, depth] of Object.entries(queues)) {
-        if (typeof depth !== 'number') continue;
+    for (const [name, val] of Object.entries(queues)) {
+        // Skip non-scalar and array fields
+        if (typeof val !== 'number' && val !== null) continue;
+        // Format age fields as human-readable
+        if (name.endsWith('_age_seconds')) {
+            if (val == null) continue;
+            const label = name.replace(/_age_seconds$/, '').replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
+            qEl.appendChild(sectionRow(label + ' Age', formatAge(val), 'color:#94a3b8'));
+            continue;
+        }
+        if (typeof val !== 'number') continue;
         const label = name.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
-        const color = depth > 0 ? 'color:#facc15' : 'color:#4ade80';
-        qEl.appendChild(sectionRow(label, String(depth), color));
+        const color = val > 0 ? 'color:#facc15' : 'color:#4ade80';
+        qEl.appendChild(sectionRow(label, String(val), color));
     }
+    // Show pending deferred item details
+    if (queues.deferred_items && queues.deferred_items.length > 0) {
+        for (const item of queues.deferred_items) {
+            const desc = (item.site || item.type) + ' \u2014 ' + item.reason;
+            const age = formatAge(item.age_s) + (item.attempts > 0 ? ', ' + item.attempts + ' retries' : '');
+            qEl.appendChild(sectionRow(desc, age, 'color:#94a3b8;font-size:10px'));
+        }
+    }
+    // Discarded/expired items — iLO-style: always visible, expandable, user-clearable
+    renderDiscardedItems(qEl, queues);
 
     // Cost
     const cost = data.cost || {};
@@ -852,6 +1264,87 @@ function updateSidePanel(data) {
         row.appendChild(el('span', 'label', 'Status'));
         row.appendChild(el('span', 'badge ' + cls, cost.budget_status));
         costEl.appendChild(row);
+    }
+}
+
+// ── Discarded items — iLO-style expand/clear ────────────────────────
+
+function renderDiscardedItems(container, queues) {
+    const items = queues.discarded_items || [];
+    const count = queues.discarded_count || items.length;
+    if (count === 0) return;
+
+    // Toggle header
+    const toggle = el('div', 'discarded-toggle');
+    const toggleText = el('span', null, 'Discarded (' + count + ')');
+    const arrow = el('span', 'arrow', '\u25B6');
+    toggle.appendChild(toggleText);
+    toggle.appendChild(arrow);
+    container.appendChild(toggle);
+
+    // Collapsible details container
+    const details = el('div', 'discarded-details');
+    container.appendChild(details);
+
+    toggle.addEventListener('click', function() {
+        const isOpen = details.classList.toggle('open');
+        arrow.classList.toggle('open', isOpen);
+    });
+
+    // Render each discarded item
+    for (const item of items) {
+        const card = el('div', 'discarded-item');
+
+        const header = el('div', 'di-header', (item.site || item.type));
+        card.appendChild(header);
+
+        const statusLabel = item.status === 'expired' ? 'Expired' : 'Discarded';
+        card.appendChild(el('div', 'di-row', 'Status: ' + statusLabel));
+        card.appendChild(el('div', 'di-row', 'Reason: ' + (item.reason || 'unknown')));
+
+        if (item.error) {
+            card.appendChild(el('div', 'di-error', 'Error: ' + item.error));
+        }
+
+        const meta = [];
+        if (item.attempts > 0) meta.push(item.attempts + ' attempts');
+        meta.push('age: ' + formatAge(item.age_s));
+        if (item.discarded_at) {
+            const d = new Date(item.discarded_at);
+            meta.push('at ' + d.toLocaleTimeString());
+        }
+        card.appendChild(el('div', 'di-row', meta.join(' | ')));
+
+        // Clear button
+        const actions = el('div', 'di-actions');
+        const clearBtn = el('button', 'clear-btn', 'Clear');
+        clearBtn.addEventListener('click', function() {
+            clearDiscardedItem(item.id).then(function() { fetchHealth(); });
+        });
+        actions.appendChild(clearBtn);
+        card.appendChild(actions);
+
+        details.appendChild(card);
+    }
+
+    // Clear All button
+    if (items.length > 1) {
+        const clearAllBtn = el('button', 'clear-btn clear-all-btn', 'Clear All Discarded (' + count + ')');
+        clearAllBtn.addEventListener('click', function() {
+            clearDiscardedItem('all').then(function() { fetchHealth(); });
+        });
+        details.appendChild(clearAllBtn);
+    }
+}
+
+async function clearDiscardedItem(itemId) {
+    try {
+        const resp = await fetch('/api/genesis/deferred/' + itemId + '/clear', { method: 'DELETE' });
+        if (!resp.ok) {
+            console.error('Clear failed:', resp.status);
+        }
+    } catch (e) {
+        console.error('Clear request failed:', e);
     }
 }
 
