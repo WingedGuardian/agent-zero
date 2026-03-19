@@ -48,7 +48,7 @@ body {
 .dot-periphery { width: 10px; height: 10px; }
 
 .dot-healthy { background: #4ade80; }
-.dot-active { background: #4caf50; }
+.dot-active { background: #4ade80; }
 .dot-degraded { background: #facc15; }
 .dot-down { background: #ef4444; }
 .dot-idle { background: #888; }
@@ -125,7 +125,7 @@ body {
     margin-right: 6px; vertical-align: middle;
 }
 .status-healthy { background: #4ade80; }
-.status-active { background: #4caf50; }
+.status-active { background: #4ade80; }
 .status-degraded { background: #facc15; }
 .status-down { background: #ef4444; }
 .status-idle { background: #888; }
@@ -705,7 +705,7 @@ function showDetail(item) {
     }
 
     // Status
-    const statusColor = item.status === 'healthy' ? '#4ade80' : item.status === 'active' ? '#4caf50' : item.status === 'degraded' ? '#facc15' : item.status === 'down' ? '#ef4444' : item.status === 'idle' ? '#888' : '#6b7280';
+    const statusColor = item.status === 'healthy' ? '#4ade80' : item.status === 'active' ? '#4ade80' : item.status === 'degraded' ? '#facc15' : item.status === 'down' ? '#ef4444' : item.status === 'idle' ? '#888' : '#6b7280';
     content.appendChild(sectionRow('Status', item.status, 'color:' + statusColor));
 
     // Metadata
@@ -752,8 +752,8 @@ function showDetail(item) {
 
     // Last run info
     if (item.data.last_run_at) {
-        const lastRunSection = el('div', 'chain-section');
-        lastRunSection.appendChild(el('div', 'chain-label', 'Last Run'));
+        const lastRunSection = el('div', 'detail-section');
+        lastRunSection.appendChild(el('h4', null, 'Last Run'));
         const runTime = new Date(item.data.last_run_at);
         const runStr = runTime.toLocaleDateString('en-US', {month: 'short', day: 'numeric'})
             + ' ' + runTime.toLocaleTimeString('en-US', {hour12: false, hour: '2-digit', minute: '2-digit'});
@@ -768,8 +768,8 @@ function showDetail(item) {
 
         // Full response in scrollable box
         if (item.data.last_response) {
-            const respSection = el('div', 'chain-section');
-            respSection.appendChild(el('div', 'chain-label', 'Last Response'));
+            const respSection = el('div', 'detail-section');
+            respSection.appendChild(el('h4', null, 'Last Response'));
             const respBox = document.createElement('pre');
             respBox.textContent = item.data.last_response;
             respBox.style.cssText = 'font-size: 11px; max-height: 200px; overflow-y: auto; background: #1e293b; padding: 8px; border-radius: 4px; white-space: pre-wrap; word-break: break-word; margin: 4px 0; color: #e2e8f0;';
