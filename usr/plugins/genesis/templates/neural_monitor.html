@@ -528,8 +528,10 @@ function getRing(siteId) {
 
 function statusClass(status) {
     if (status === 'healthy') return 'dot-healthy';
+    if (status === 'active') return 'dot-active';
     if (status === 'degraded') return 'dot-degraded';
     if (status === 'down') return 'dot-down';
+    if (status === 'idle') return 'dot-idle';
     return 'dot-unknown';
 }
 
