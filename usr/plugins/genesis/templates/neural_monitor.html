@@ -347,6 +347,10 @@ const SITE_META = {
         name: 'CC Background', desc: 'Autonomous background sessions (reflection, tasks)',
         category: 'core', frequency: 'On demand', costPolicy: 'Subscription',
     },
+    'embedding': {
+        name: 'Embedding', desc: 'Vector embeddings via Ollama (qwen3-embedding)',
+        category: 'core', frequency: 'On store', costPolicy: 'Local',
+    },
     '2_triage': {
         name: 'Triage', desc: 'Classify signals \u2192 ignore/log/micro/light/deep/critical',
         category: 'classification', frequency: 'Every 5 min', costPolicy: 'Free primary',
@@ -1181,7 +1185,7 @@ function updateSidePanel(data) {
         const sites = data.call_sites || {};
         const siteIds = Object.keys(sites);
         const totalSites = siteIds.length;
-        const healthySites = siteIds.filter(id => sites[id].status === 'healthy').length;
+        const healthySites = siteIds.filter(id => sites[id].status === 'healthy' || sites[id].status === 'active').length;
         if (totalSites > 0) {
             const summaryColor = healthySites === totalSites ? 'color:#4ade80' : healthySites > totalSites * 0.5 ? 'color:#facc15' : 'color:#ef4444';
             resEl.appendChild(sectionRow('Call sites', healthySites + '/' + totalSites + ' healthy', summaryColor));
@@ -1194,7 +1198,7 @@ function updateSidePanel(data) {
             const cat = meta.category;
             if (!catHealth[cat]) catHealth[cat] = { total: 0, healthy: 0 };
             catHealth[cat].total++;
-            if (info.status === 'healthy') catHealth[cat].healthy++;
+            if (info.status === 'healthy' || info.status === 'active') catHealth[cat].healthy++;
         }
         const cats = Object.keys(catHealth).sort();
         if (cats.length > 0) {
