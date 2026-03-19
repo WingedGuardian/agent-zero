@@ -48,8 +48,10 @@ body {
 .dot-periphery { width: 10px; height: 10px; }
 
 .dot-healthy { background: #4ade80; }
+.dot-active { background: #4caf50; }
 .dot-degraded { background: #facc15; }
 .dot-down { background: #ef4444; }
+.dot-idle { background: #888; }
 .dot-unknown { background: #6b7280; }
 
 /* Category border colors */
@@ -123,8 +125,10 @@ body {
     margin-right: 6px; vertical-align: middle;
 }
 .status-healthy { background: #4ade80; }
+.status-active { background: #4caf50; }
 .status-degraded { background: #facc15; }
 .status-down { background: #ef4444; }
+.status-idle { background: #888; }
 .status-unknown { background: #6b7280; }
 
 .badge {
@@ -699,7 +703,7 @@ function showDetail(item) {
     }
 
     // Status
-    const statusColor = item.status === 'healthy' ? '#4ade80' : item.status === 'degraded' ? '#facc15' : item.status === 'down' ? '#ef4444' : '#6b7280';
+    const statusColor = item.status === 'healthy' ? '#4ade80' : item.status === 'active' ? '#4caf50' : item.status === 'degraded' ? '#facc15' : item.status === 'down' ? '#ef4444' : item.status === 'idle' ? '#888' : '#6b7280';
     content.appendChild(sectionRow('Status', item.status, 'color:' + statusColor));
 
     // Metadata
