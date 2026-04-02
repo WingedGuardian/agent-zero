@@ -49,7 +49,7 @@ body {
 
 .dot-healthy { background: #4ade80; }
 .dot-active { background: #4ade80; }
-.dot-degraded { background: #facc15; }
+.dot-degraded { background: #f0ad4e; }
 .dot-down { background: #ef4444; }
 .dot-idle { background: #888; }
 .dot-unknown { background: #6b7280; }
@@ -126,7 +126,7 @@ body {
 }
 .status-healthy { background: #4ade80; }
 .status-active { background: #4ade80; }
-.status-degraded { background: #facc15; }
+.status-degraded { background: #f0ad4e; }
 .status-down { background: #ef4444; }
 .status-idle { background: #888; }
 .status-unknown { background: #6b7280; }
@@ -340,11 +340,11 @@ body {
 
 const SITE_META = {
     'cc_foreground': {
-        name: 'CC Foreground', desc: 'Primary user conversation via Claude Code',
+        name: 'CC Foreground', desc: 'Reachability: Telegram, CLI, and web conversations',
         category: 'core', frequency: 'Continuous', costPolicy: 'Subscription',
     },
     'cc_background': {
-        name: 'CC Background', desc: 'Autonomous background sessions (reflection, tasks)',
+        name: 'CC Background', desc: 'Capacity for autonomous sessions (reflection, tasks)',
         category: 'core', frequency: 'On demand', costPolicy: 'Subscription',
     },
     'embedding': {
@@ -533,7 +533,7 @@ function getRing(siteId) {
 function statusClass(status) {
     if (status === 'healthy') return 'dot-healthy';
     if (status === 'active') return 'dot-active';
-    if (status === 'degraded') return 'dot-degraded';
+    if (status === 'degraded' || status === 'warning' || status === 'fallback') return 'dot-degraded';
     if (status === 'down') return 'dot-down';
     if (status === 'idle') return 'dot-idle';
     return 'dot-unknown';
@@ -545,8 +545,8 @@ function catClass(category) {
 
 function infraStatusClass(probe) {
     const status = typeof probe === 'string' ? probe : probe?.status;
-    if (status === 'healthy') return 'status-healthy';
-    if (status === 'degraded') return 'status-degraded';
+    if (status === 'healthy' || status === 'active') return 'status-healthy';
+    if (status === 'degraded' || status === 'warning') return 'status-degraded';
     if (status === 'down') return 'status-down';
     if (probe?.free_pct != null) {
         if (probe.free_pct > 20) return 'status-healthy';
@@ -601,15 +601,37 @@ function buildNeuralMap(data) {
 
     const rings = { center: [], inner: [], outer: [], periphery: [] };
 
-    // CC sessions → center
+    // CC sessions → center (reachability-based, not session-count-based)
     const ccSessions = data.cc_sessions || {};
-    const fgStatus = (ccSessions.foreground || {}).status || 'unknown';
-    const bgStatus = (ccSessions.background || {}).status || 'unknown';
-    rings.center.push({ id: 'cc_foreground', status: fgStatus, data: ccSessions.foreground || {} });
+    const bridgeUp = data.services?.bridge?.active_state === 'active';
+    const ccRealtime = ccSessions.realtime_status || 'unknown';
+
+    // Foreground: is a user conversation able to reach Genesis?
+    // Bridge running + CC not unavailable = reachable.
+    let fgStatus;
+    if (ccRealtime === 'UNAVAILABLE') {
+        fgStatus = 'down';
+    } else if (ccRealtime === 'RATE_LIMITED' || ccRealtime === 'THROTTLED') {
+        fgStatus = 'degraded';
+    } else if (bridgeUp) {
+        fgStatus = 'healthy';
+    } else {
+        fgStatus = 'unknown';
+    }
+
+    // Background: budget status reflects capacity for autonomous sessions.
+    const bgRaw = (ccSessions.background || {}).status || 'unknown';
+    const bgStatus = bgRaw === 'healthy' ? 'healthy' : bgRaw === 'error' ? 'down' : bgRaw === 'unknown' ? 'unknown' : 'degraded';
+
+    rings.center.push({ id: 'cc_foreground', status: fgStatus, data: { ...ccSessions.foreground, reachable: fgStatus !== 'down' && fgStatus !== 'unknown' } });
     rings.center.push({ id: 'cc_background', status: bgStatus, data: ccSessions.background || {} });
 
     // Call sites → rings by RING_ASSIGNMENT
+    // Skip cc_foreground/cc_background — already synthesized from cc_sessions above.
+    // call_site_last_run may contain stale entries for these, causing duplicate dots.
+    const CENTER_SYNTHETIC = new Set(['cc_foreground', 'cc_background']);
     for (const [siteId, info] of Object.entries(data.call_sites || {})) {
+        if (CENTER_SYNTHETIC.has(siteId)) continue;
         const ring = getRing(siteId);
         rings[ring].push({ id: siteId, status: info.status, data: info });
     }
@@ -709,7 +731,7 @@ function showDetail(item) {
     }
 
     // Status
-    const statusColor = item.status === 'healthy' ? '#4ade80' : item.status === 'active' ? '#4ade80' : item.status === 'degraded' ? '#facc15' : item.status === 'down' ? '#ef4444' : item.status === 'idle' ? '#888' : '#6b7280';
+    const statusColor = item.status === 'healthy' ? '#4ade80' : item.status === 'active' ? '#4ade80' : (item.status === 'degraded' || item.status === 'warning' || item.status === 'fallback') ? '#f0ad4e' : item.status === 'down' ? '#ef4444' : item.status === 'idle' ? '#888' : '#6b7280';
     content.appendChild(sectionRow('Status', item.status, 'color:' + statusColor));
 
     // Metadata
@@ -1405,9 +1427,83 @@ async function fetchHealth() {
     }
 }
 
+// ── Pause / Kill Switch ──────────────────────────────
+let pauseState = { paused: false, reason: null, since: null };
+
+async function fetchPauseState() {
+    try {
+        const resp = await fetch('/api/genesis/pause');
+        if (resp.ok) {
+            pauseState = await resp.json();
+            renderPauseFooter();
+        }
+    } catch (e) { console.warn('Pause state fetch failed:', e); }
+}
+
+function renderPauseFooter() {
+    const dot = document.getElementById('pause-dot');
+    const label = document.getElementById('pause-label');
+    const since = document.getElementById('pause-since');
+    const btn = document.getElementById('pause-btn');
+    if (!dot || !label || !btn) return;
+    if (pauseState.paused) {
+        dot.style.background = '#ffa726';
+        label.textContent = 'PAUSED';
+        label.style.color = '#ffa726';
+        since.textContent = pauseState.since ? 'since ' + new Date(pauseState.since).toLocaleTimeString() : '';
+        btn.textContent = 'Resume Genesis';
+        btn.style.color = '#66bb6a';
+        btn.style.borderColor = 'rgba(102,187,106,0.3)';
+        btn.style.background = 'rgba(102,187,106,0.12)';
+    } else {
+        dot.style.background = '#66bb6a';
+        label.textContent = 'RUNNING';
+        label.style.color = '#66bb6a';
+        since.textContent = '';
+        btn.textContent = 'Pause Genesis';
+        btn.style.color = '#ffa726';
+        btn.style.borderColor = 'rgba(255,167,38,0.3)';
+        btn.style.background = 'rgba(255,167,38,0.12)';
+    }
+}
+
+async function togglePause() {
+    const newState = !pauseState.paused;
+    const pauseMsg = "Pause Genesis?\n\nThis will stop ALL background activity:\n\u2022 Reflections\n\u2022 Surplus tasks\n\u2022 Outreach\n\u2022 Inbox monitoring\n\nConversations still work but without background enrichment.\nYou must manually resume via this button or /pause off in Telegram.";
+    const resumeMsg = "Resume Genesis?\n\nAll background activity will restart\n(reflections, surplus tasks, outreach, inbox monitoring).";
+    if (!confirm(newState ? pauseMsg : resumeMsg)) return;
+    try {
+        const resp = await fetch('/api/genesis/pause', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ paused: newState, reason: 'Dashboard toggle' }),
+        });
+        if (resp.ok) await fetchPauseState();
+    } catch (e) { console.warn('Pause toggle failed:', e); }
+}
+
 fetchHealth();
+fetchPauseState();
 setInterval(fetchHealth, 15000);
+setInterval(fetchPauseState, 15000);
 setInterval(tickUpdateTimer, 1000);
 </script>
+
+<!-- Kill Switch Footer -->
+<div id="pause-footer" style="position:fixed;bottom:0;left:0;right:0;z-index:1000;
+    background:#1a1a2e;border-top:1px solid #333;padding:0.5rem 1.5rem;
+    display:flex;align-items:center;justify-content:space-between;font-size:0.78rem;">
+  <div style="display:flex;align-items:center;gap:0.75rem;">
+    <span id="pause-dot" style="display:inline-block;width:8px;height:8px;border-radius:50%;background:#66bb6a;"></span>
+    <span id="pause-label" style="color:#66bb6a;font-weight:600;">RUNNING</span>
+    <span id="pause-since" style="color:#888;"></span>
+  </div>
+  <button id="pause-btn" onclick="togglePause()"
+    style="font-size:0.74rem;padding:0.35rem 0.9rem;border-radius:4px;cursor:pointer;
+           font-weight:500;color:#ffa726;border:1px solid rgba(255,167,38,0.3);
+           background:rgba(255,167,38,0.12);">Pause Genesis</button>
+</div>
+<div style="height:50px;"></div>
+
 </body>
 </html>
