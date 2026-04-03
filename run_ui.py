@@ -27,7 +27,7 @@ from python.helpers import login
 import socketio  # type: ignore[import-untyped]
 from socketio import ASGIApp, packet
 from starlette.applications import Starlette
-from starlette.routing import Mount
+from starlette.routing import Mount, WebSocketRoute
 from uvicorn.middleware.wsgi import WSGIMiddleware
 from python.helpers.websocket_manager import WebSocketManager
 from python.helpers.websocket_namespace_discovery import discover_websocket_namespaces
@@ -471,10 +471,21 @@ def run():
     init_a0()
 
     wsgi_app = WSGIMiddleware(webapp)
+
+    # Genesis terminal WebSocket — must be above the WSGI catch-all because
+    # WSGIMiddleware cannot handle WebSocket upgrades.
+    _terminal_ws_routes = []
+    try:
+        from genesis.dashboard.terminal_ws_asgi import terminal_ws_endpoint
+        _terminal_ws_routes = [WebSocketRoute("/ws/terminal", terminal_ws_endpoint)]
+    except ImportError:
+        pass  # Genesis not installed
+
     starlette_app = Starlette(
         routes=[
             Mount("/mcp", app=mcp_server.DynamicMcpProxy.get_instance()),
             Mount("/a2a", app=fasta2a_server.DynamicA2AProxy.get_instance()),
+            *_terminal_ws_routes,
             Mount("/", app=wsgi_app),
         ]
     )
