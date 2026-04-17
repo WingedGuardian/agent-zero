@@ -1,3 +1,11 @@
+> **Historical note — archived fork.** This is a fork of an early version of [Agent Zero](https://github.com/frdel/agent-zero) from the era when it was a required runtime dependency for V1/V2 of [GENesis-AGI](https://github.com/WingedGuardian/GENesis-AGI). Both upstream Agent Zero and Genesis have since moved well past this snapshot — upstream has its own modern release line, and Genesis is now a standalone architecture with no Agent Zero dependency.
+>
+> **Status:** archived for lineage only. No active development. For the canonical and current Agent Zero, use [upstream](https://github.com/frdel/agent-zero). For the current agentic work, see [GENesis-AGI](https://github.com/WingedGuardian/GENesis-AGI).
+>
+> Upstream README (as of the fork point) follows.
+
+---
+
 <div align="center">
 
 # `Agent Zero`
